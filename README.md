@@ -44,13 +44,13 @@ No API call in this step.
 
 ### 2) Resolve project metadata
 
-- **REST** `GET /projects/:url_encoded_path`
+- **REST** [`GET /projects/:url_encoded_path`](https://docs.gitlab.com/api/projects//#retrieve-a-project)
 
 Used to get the numeric project ID.
 
 ### 3) Fetch issue
 
-- **REST** `GET /projects/:project_id/issues/:issue_iid`
+- **REST** [`GET /projects/:project_id/issues/:issue_iid`](https://docs.gitlab.com/api/issues/#retrieve-a-project-issue)
 
 Used as the input issue object in the final report.
 
@@ -58,8 +58,8 @@ Used as the input issue object in the final report.
 
 Regrizer intentionally uses the union of these two endpoints:
 
-- **REST** `GET /projects/:project_id/issues/:issue_iid/related_merge_requests`
-- **REST** `GET /projects/:project_id/issues/:issue_iid/closed_by`
+- **REST** [`GET /projects/:project_id/issues/:issue_iid/related_merge_requests`](https://docs.gitlab.com/api/issues/#list-all-merge-requests-related-to-an-issue)
+- **REST** [`GET /projects/:project_id/issues/:issue_iid/closed_by`](https://docs.gitlab.com/api/issues/#list-all-merge-requests-that-close-an-issue-on-merge)
 
 Then it deduplicates by `(project_id, iid)`.
 
@@ -67,7 +67,7 @@ Then it deduplicates by `(project_id, iid)`.
 
 For each MR reference from step 4:
 
-- **REST** `GET /projects/:mr_project_id/merge_requests/:mr_iid`
+- **REST** [`GET /projects/:mr_project_id/merge_requests/:mr_iid`](https://docs.gitlab.com/api/merge_requests/#retrieve-a-merge-request)
 
 Filtering and ordering:
 
@@ -86,8 +86,8 @@ This identifies the commit that landed on target branch.
 
 ### 7) Fetch selected commit details and its diff
 
-- **REST** `GET /projects/:project_id/repository/commits/:sha`
-- **REST** `GET /projects/:project_id/repository/commits/:sha/diff`
+- **REST** [`GET /projects/:project_id/repository/commits/:sha`](https://docs.gitlab.com/api/commits/#retrieve-a-commit)
+- **REST** [`GET /projects/:project_id/repository/commits/:sha/diff`](https://docs.gitlab.com/api/commits/#retrieve-a-commit)
 
 The commit object provides parent SHAs; for merge commits, the analyzer uses the first parent as pre-image reference.
 
@@ -106,9 +106,9 @@ Local parsing with unified hunk headers, producing:
 For each changed file:
 
 - Post-image (after commit):
-  - **REST** `GET /projects/:project_id/repository/files/:url_encoded_new_path/raw?ref=:commit_sha`
+  - **REST** [`GET /projects/:project_id/repository/files/:url_encoded_new_path/raw?ref=:commit_sha`](https://docs.gitlab.com/api/repository_files/#retrieve-a-raw-file-from-a-repository)
 - Pre-image (before commit), when parent exists:
-  - **REST** `GET /projects/:project_id/repository/files/:url_encoded_old_path/raw?ref=:first_parent_sha`
+  - **REST** [`GET /projects/:project_id/repository/files/:url_encoded_old_path/raw?ref=:first_parent_sha`](https://docs.gitlab.com/api/repository_files/#retrieve-a-raw-file-from-a-repository)
 
 Used to render 7 lines before/after plus exact before/after lines for chunk content.
 
@@ -116,20 +116,20 @@ Used to render 7 lines before/after plus exact before/after lines for chunk cont
 
 For each removed line with a valid old line number:
 
-- **REST** `GET /projects/:project_id/repository/files/:url_encoded_old_path/blame?ref=:first_parent_sha&range[start]=:line&range[end]=:line`
+- **REST** [`GET /projects/:project_id/repository/files/:url_encoded_old_path/blame?ref=:first_parent_sha&range[start]=:line&range[end]=:line`](https://docs.gitlab.com/api/repository_files/#retrieve-file-blame-history-from-a-repository)
 
 Then, when a previous commit SHA is found, Regrizer enriches the row for links and related metadata:
 
-- **REST** `GET /projects/:project_id/repository/commits/:previous_commit_sha`
+- **REST** [`GET /projects/:project_id/repository/commits/:previous_commit_sha`](https://docs.gitlab.com/api/commits/#retrieve-a-commit)
   - used to link the SHA to the commit page (`web_url`)
-- **REST** `GET /projects/:project_id/repository/commits/:previous_commit_sha/merge_requests`
+- **REST** [`GET /projects/:project_id/repository/commits/:previous_commit_sha/merge_requests`](https://docs.gitlab.com/api/commits/#list-merge-requests-associated-with-a-commit)
   - used to resolve a related merged MR for the commit
-- **REST** `GET /projects/:mr_project_id/merge_requests/:mr_iid/closes_issues`
+- **REST** [`GET /projects/:mr_project_id/merge_requests/:mr_iid/closes_issues`](https://docs.gitlab.com/api/merge_requests/#list-issues-that-close-on-merge)
   - used to list issues closed by the MR
-- **REST** `GET /projects/:mr_project_id/merge_requests/:mr_iid/related_issues`
+- **REST** [`GET /projects/:mr_project_id/merge_requests/:mr_iid/related_issues`](https://docs.gitlab.com/api/merge_requests/#list-issues-related-to-the-merge-request)
   - used to list issues related to the MR
 
-Issues from both endpoints are merged and deduplicated (with existing GraphQL fallback for `closes_issues` if needed).
+Issues from both endpoints are merged and deduplicated (with existing [GraphQL](https://docs.gitlab.com/api/graphql/) fallback for `closes_issues` if needed).
 
 The resulting old-side table row includes:
 
