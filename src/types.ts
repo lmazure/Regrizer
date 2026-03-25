@@ -101,15 +101,24 @@ export interface ReportLine {
   unresolvedReason?: string;
 }
 
+export interface ReportChunkRow {
+  lineNumber: number | null;
+  afterText: string;
+  beforeText?: string;
+  previousCommitSha?: string | null;
+  previousCommitWebUrl?: string | null;
+  previousMergeRequest?: GitLabMergeRequestRef | null;
+  previousMergeRequestIssues?: RelatedIssueRef[];
+  unresolvedReason?: string;
+  rowKind: "context" | "added" | "removed" | "paired";
+}
+
 export interface ReportChunk {
   oldStart: number;
   oldCount: number;
   newStart: number;
   newCount: number;
-  contextBefore: ReportLine[];
-  afterLines: ReportLine[];
-  beforeLines: ReportLine[];
-  contextAfter: ReportLine[];
+  rows: ReportChunkRow[];
 }
 
 export interface ReportCommitFile {

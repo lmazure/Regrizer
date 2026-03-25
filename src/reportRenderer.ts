@@ -1,61 +1,40 @@
 import { AnalysisResult, ReportChunk, ReportCommit, ReportCommitFile, ReportMergeRequest } from "./types.js";
 import { escapeHtml } from "./utils.js";
 
-function renderCodeRows(lines: Array<{ lineNumber: number | null; text: string }>, cssClass = ""): string {
-  return lines
-    .map((line) => {
-      return `<tr class="${cssClass}"><td class="ln">${line.lineNumber ?? ""}</td><td><code>${escapeHtml(line.text)}</code></td></tr>`;
-    })
-    .join("\n");
-}
+function renderChunkRows(chunk: ReportChunk): string {
+  return chunk.rows
+    .map((row) => {
+      const commitCell = row.previousCommitSha
+        ? (row.previousCommitWebUrl
+          ? `<a href="${escapeHtml(row.previousCommitWebUrl)}" target="_blank" rel="noopener"><code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code></a>`
+          : `<code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code>`)
+        : (row.unresolvedReason ? `<span class="unresolved">${escapeHtml(row.unresolvedReason)}</span>` : "");
 
-function renderBeforeCommitRows(chunk: ReportChunk): string {
-  return chunk.beforeLines
-    .map((line) => {
-      const commitCell = line.previousCommitSha
-        ? (line.previousCommitWebUrl
-          ? `<a href="${escapeHtml(line.previousCommitWebUrl)}" target="_blank" rel="noopener"><code>${escapeHtml(line.previousCommitSha.slice(0, 12))}</code></a>`
-          : `<code>${escapeHtml(line.previousCommitSha.slice(0, 12))}</code>`)
-        : `<span class="unresolved">${escapeHtml(line.unresolvedReason ?? "Unknown")}</span>`;
+      const mrCell = row.previousMergeRequest
+        ? `<a href="${escapeHtml(row.previousMergeRequest.webUrl ?? "")}" target="_blank" rel="noopener">!${row.previousMergeRequest.iid}</a>`
+        : "";
 
-      const mrCell = line.previousMergeRequest
-        ? `<a href="${escapeHtml(line.previousMergeRequest.webUrl ?? "")}" target="_blank" rel="noopener">!${line.previousMergeRequest.iid}</a>`
-        : `<span class="unresolved">-</span>`;
-
-      const issuesCell = (line.previousMergeRequestIssues && line.previousMergeRequestIssues.length > 0)
-        ? line.previousMergeRequestIssues
+      const issuesCell = (row.previousMergeRequestIssues && row.previousMergeRequestIssues.length > 0)
+        ? row.previousMergeRequestIssues
           .map((issue) => `<a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a>`)
           .join("<br />")
-        : `<span class="unresolved">-</span>`;
+        : "";
 
-      return `<tr><td class="ln">${line.lineNumber ?? ""}</td><td><code>${escapeHtml(line.text)}</code></td><td>${commitCell}</td><td>${mrCell}</td><td>${issuesCell}</td></tr>`;
+      return `<tr class="row-${row.rowKind}"><td class="ln">${row.lineNumber ?? ""}</td><td><code>${escapeHtml(row.afterText)}</code></td><td><code>${escapeHtml(row.beforeText ?? "")}</code></td><td>${commitCell}</td><td>${mrCell}</td><td>${issuesCell}</td></tr>`;
     })
     .join("\n");
 }
 
 function renderChunk(chunk: ReportChunk, index: number): string {
-  const contextBeforeRows = renderCodeRows(chunk.contextBefore, "context");
-  const afterRows = renderCodeRows(chunk.afterLines, "after");
-  const beforeRows = renderBeforeCommitRows(chunk);
-  const contextAfterRows = renderCodeRows(chunk.contextAfter, "context");
+  const rows = renderChunkRows(chunk);
 
   return `
     <section class="chunk">
       <div class="chunk-title">Chunk ${index + 1} · -${chunk.oldStart},${chunk.oldCount} +${chunk.newStart},${chunk.newCount}</div>
-      <div class="block-title">Context before (7)</div>
-      <table class="code-table"><tbody>${contextBeforeRows || ""}</tbody></table>
-
-      <div class="block-title">After commit</div>
-      <table class="code-table"><tbody>${afterRows || ""}</tbody></table>
-
-      <div class="block-title">Before commit (with previous commit per line)</div>
       <table class="code-table">
-        <thead><tr><th class="ln">Line</th><th>Code</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
-        <tbody>${beforeRows || ""}</tbody>
+        <thead><tr><th class="ln">Line</th><th>Code after commit</th><th>Code before commit</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
+        <tbody>${rows || ""}</tbody>
       </table>
-
-      <div class="block-title">Context after (7)</div>
-      <table class="code-table"><tbody>${contextAfterRows || ""}</tbody></table>
     </section>
   `;
 }
@@ -131,6 +110,8 @@ export function renderHtmlReport(result: AnalysisResult): string {
         --card: #ffffff;
         --warn: #7c2d12;
         --after: #effcf4;
+        --before: #fff1f2;
+        --paired: #fff8e8;
         --context: #f5f7fb;
       }
       body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--fg); }
@@ -143,12 +124,13 @@ export function renderHtmlReport(result: AnalysisResult): string {
       .file { padding: 10px; margin-top: 10px; }
       .chunk { padding: 10px; margin-top: 10px; }
       .chunk-title { font-weight: 600; margin-bottom: 6px; }
-      .block-title { font-weight: 600; margin: 10px 0 4px 0; }
       .code-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
       .code-table td, .code-table th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; }
       .ln { width: 70px; color: var(--muted); text-align: right; }
-      tr.after td { background: var(--after); }
-      tr.context td { background: var(--context); }
+      tr.row-added td { background: var(--after); }
+      tr.row-removed td { background: var(--before); }
+      tr.row-paired td { background: var(--paired); }
+      tr.row-context td { background: var(--context); }
       code { white-space: pre-wrap; word-break: break-word; font-family: "Consolas", "Courier New", monospace; }
       .unresolved { color: var(--warn); }
       a { color: #0a58ca; text-decoration: none; }

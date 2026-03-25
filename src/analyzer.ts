@@ -10,6 +10,7 @@ import {
   ParsedIssueUrl,
   RelatedIssueRef,
   ReportChunk,
+  ReportChunkRow,
   ReportCommit,
   ReportCommitFile,
   ReportLine,
@@ -206,15 +207,14 @@ export class IssueAnalyzer {
         });
       }
 
+      const rows = this.buildChunkRows(contextBefore, afterLines, beforeLines, contextAfter);
+
       chunks.push({
         oldStart: hunk.oldStart,
         oldCount: hunk.oldCount,
         newStart: hunk.newStart,
         newCount: hunk.newCount,
-        contextBefore,
-        afterLines,
-        beforeLines,
-        contextAfter,
+        rows,
       });
     }
 
@@ -240,6 +240,74 @@ export class IssueAnalyzer {
       lineNumber: line.lineNumber,
       text: line.lineNumber && postLines ? (postLines[line.lineNumber - 1] ?? line.text) : line.text,
     }));
+  }
+
+  private buildChunkRows(
+    contextBefore: ReportLine[],
+    afterLines: ReportLine[],
+    beforeLines: ReportLine[],
+    contextAfter: ReportLine[],
+  ): ReportChunkRow[] {
+    const rows: ReportChunkRow[] = [];
+
+    for (const line of contextBefore) {
+      rows.push({
+        lineNumber: line.lineNumber,
+        afterText: line.text,
+        rowKind: "context",
+      });
+    }
+
+    const pairCount = Math.min(afterLines.length, beforeLines.length);
+    for (let i = 0; i < pairCount; i += 1) {
+      const after = afterLines[i];
+      const before = beforeLines[i];
+      rows.push({
+        lineNumber: after.lineNumber,
+        afterText: after.text,
+        beforeText: before.text,
+        previousCommitSha: before.previousCommitSha,
+        previousCommitWebUrl: before.previousCommitWebUrl,
+        previousMergeRequest: before.previousMergeRequest,
+        previousMergeRequestIssues: before.previousMergeRequestIssues,
+        unresolvedReason: before.unresolvedReason,
+        rowKind: "paired",
+      });
+    }
+
+    for (let i = pairCount; i < afterLines.length; i += 1) {
+      const after = afterLines[i];
+      rows.push({
+        lineNumber: after.lineNumber,
+        afterText: after.text,
+        rowKind: "added",
+      });
+    }
+
+    for (let i = pairCount; i < beforeLines.length; i += 1) {
+      const before = beforeLines[i];
+      rows.push({
+        lineNumber: null,
+        afterText: "",
+        beforeText: before.text,
+        previousCommitSha: before.previousCommitSha,
+        previousCommitWebUrl: before.previousCommitWebUrl,
+        previousMergeRequest: before.previousMergeRequest,
+        previousMergeRequestIssues: before.previousMergeRequestIssues,
+        unresolvedReason: before.unresolvedReason,
+        rowKind: "removed",
+      });
+    }
+
+    for (const line of contextAfter) {
+      rows.push({
+        lineNumber: line.lineNumber,
+        afterText: line.text,
+        rowKind: "context",
+      });
+    }
+
+    return rows;
   }
 
   private pickContextAfter(lines: string[] | null, endLine: number, radius: number): ReportLine[] {

@@ -9,15 +9,15 @@ The report hierarchy is:
 3. Files touched by that commit
 4. Diff chunks per file
 5. For each chunk:
-   - 7 lines before context
-   - unchanged leading hunk context lines (from GitLab diff)
-   - lines after commit (new side, `+` lines only)
-   - lines before commit (old side, `-` lines only) with:
-     - previous commit (clickable SHA to commit page)
-     - merge request link for that commit (when available)
-     - related issue links for that merge request
-   - unchanged trailing hunk context lines (from GitLab diff)
-   - 7 lines after context
+   - a single table with columns:
+     - line number (as in file after commit)
+     - code after commit
+     - code before commit
+     - previous commit
+     - merge request
+     - related issues
+   - unchanged rows fill only line number + code-after columns
+   - changed rows fill before/provenance columns when applicable
 
 ## Architecture
 
@@ -113,7 +113,7 @@ For each changed file:
 - Pre-image (before commit), when parent exists:
   - **REST** [`GET /projects/:project_id/repository/files/:url_encoded_old_path/raw?ref=:first_parent_sha`](https://docs.gitlab.com/api/repository_files/#retrieve-a-raw-file-from-a-repository)
 
-Used to render 7 lines before/after plus exact chunk lines. Unchanged hunk boundary lines are rendered in context tables; modified tables only show real additions/removals.
+Used to render 7 lines before/after plus exact chunk lines in a single table per chunk. Unchanged rows only populate the first two columns; changed rows also carry before/provenance metadata.
 
 ### 10) Attribute previous commit per old-side line
 
@@ -134,7 +134,7 @@ Then, when a previous commit SHA is found, Regrizer enriches the row for links a
 
 Issues from both endpoints are merged and deduplicated (with existing [GraphQL](https://docs.gitlab.com/api/graphql/) fallback for `closes_issues` if needed).
 
-The resulting old-side table row includes:
+Rows with old-side (`-`) lines include:
 
 - previous commit (short SHA hyperlink)
 - merge request hyperlink (if found)
@@ -144,7 +144,7 @@ The resulting old-side table row includes:
 
 No API call in this step.
 
-The renderer outputs nested, collapsible sections for MR -> commit -> file -> chunk with code blocks and metadata.
+The renderer outputs nested sections for MR -> commit -> file -> chunk, with one color-coded unified table per chunk (`context`, `paired`, `added`, `removed` rows).
 
 ## Requirements
 
