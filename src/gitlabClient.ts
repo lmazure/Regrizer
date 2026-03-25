@@ -203,13 +203,26 @@ export class GitLabClient {
   }
 
   async getIssuesClosedByMergeRequest(projectId: number, mrIid: number): Promise<RelatedIssueRef[]> {
-    const direct = await this.safeRequest(
+    const closesIssues = await this.safeRequest(
       () => this.requestJson<Array<{ title: string; web_url: string }>>(`/projects/${projectId}/merge_requests/${mrIid}/closes_issues`),
       [],
     );
 
-    if (direct.length > 0) {
-      return direct.map((issue) => ({ title: issue.title, webUrl: issue.web_url }));
+    const relatedIssues = await this.safeRequest(
+      () => this.requestJson<Array<{ title: string; web_url: string }>>(`/projects/${projectId}/merge_requests/${mrIid}/related_issues`),
+      [],
+    );
+
+    const refs = new Map<string, RelatedIssueRef>();
+    for (const issue of closesIssues) {
+      refs.set(issue.web_url, { title: issue.title, webUrl: issue.web_url });
+    }
+    for (const issue of relatedIssues) {
+      refs.set(issue.web_url, { title: issue.title, webUrl: issue.web_url });
+    }
+
+    if (refs.size > 0) {
+      return [...refs.values()];
     }
 
     const graphql = await this.safeRequest(() => this.getIssuesClosedByMergeRequestGraphQl(projectId, mrIid), []);

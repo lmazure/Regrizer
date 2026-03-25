@@ -8,6 +8,7 @@ import {
   GitLabMergeRequest,
   GitLabMergeRequestRef,
   ParsedIssueUrl,
+  RelatedIssueRef,
   ReportChunk,
   ReportCommit,
   ReportCommitFile,
@@ -15,8 +16,15 @@ import {
   ReportMergeRequest,
 } from "./types.js";
 
+interface PreviousCommitContext {
+  commitWebUrl: string | null;
+  mergeRequest: GitLabMergeRequestRef | null;
+  mergeRequestIssues: RelatedIssueRef[];
+}
+
 export class IssueAnalyzer {
   private readonly blameCache = new Map<string, string | null>();
+  private readonly previousCommitContextCache = new Map<string, PreviousCommitContext | null>();
 
   constructor(private readonly client: GitLabClient, private readonly logger: Logger) {}
 
@@ -177,11 +185,17 @@ export class IssueAnalyzer {
 
         const text = line.lineNumber && preLines ? (preLines[line.lineNumber - 1] ?? line.text) : line.text;
         const previousCommitSha = await this.resolvePreviousCommitForPreLine(projectId, oldPath, parentRef, line.lineNumber);
+        const previousContext = previousCommitSha
+          ? await this.resolvePreviousCommitContext(projectId, previousCommitSha)
+          : null;
 
         beforeLines.push({
           lineNumber: line.lineNumber,
           text,
           previousCommitSha,
+          previousCommitWebUrl: previousContext?.commitWebUrl ?? null,
+          previousMergeRequest: previousContext?.mergeRequest ?? null,
+          previousMergeRequestIssues: previousContext?.mergeRequestIssues ?? [],
           unresolvedReason: previousCommitSha ? undefined : "Blame did not return a commit",
         });
       }
@@ -243,6 +257,33 @@ export class IssueAnalyzer {
     const sha = await this.client.getBlameCommitShaForLine(projectId, filePath, parentRef, lineNumber);
     this.blameCache.set(key, sha);
     return sha;
+  }
+
+  private async resolvePreviousCommitContext(projectId: number, commitSha: string): Promise<PreviousCommitContext | null> {
+    const key = `${projectId}:${commitSha}`;
+    if (this.previousCommitContextCache.has(key)) {
+      return this.previousCommitContextCache.get(key)!;
+    }
+
+    try {
+      const commit = await this.client.getCommit(projectId, commitSha);
+      const mergeRequests = await this.client.getMergeRequestsForCommit(projectId, commitSha);
+      const mergeRequest = mergeRequests[0] ?? null;
+      const mergeRequestIssues = mergeRequest
+        ? await this.client.getIssuesClosedByMergeRequest(mergeRequest.projectId, mergeRequest.iid)
+        : [];
+
+      const context: PreviousCommitContext = {
+        commitWebUrl: commit.web_url ?? null,
+        mergeRequest,
+        mergeRequestIssues,
+      };
+      this.previousCommitContextCache.set(key, context);
+      return context;
+    } catch {
+      this.previousCommitContextCache.set(key, null);
+      return null;
+    }
   }
 
   private async safeReadFileLines(projectId: number, filePath: string, ref: string): Promise<string[] | null> {

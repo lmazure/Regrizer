@@ -95,6 +95,9 @@ export interface ReportLine {
   lineNumber: number | null;
   text: string;
   previousCommitSha?: string | null;
+  previousCommitWebUrl?: string | null;
+  previousMergeRequest?: GitLabMergeRequestRef | null;
+  previousMergeRequestIssues?: RelatedIssueRef[];
   unresolvedReason?: string;
 }
 

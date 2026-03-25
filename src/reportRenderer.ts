@@ -12,10 +12,23 @@ function renderCodeRows(lines: Array<{ lineNumber: number | null; text: string }
 function renderBeforeCommitRows(chunk: ReportChunk): string {
   return chunk.beforeLines
     .map((line) => {
-      const sha = line.previousCommitSha
-        ? `<code>${escapeHtml(line.previousCommitSha.slice(0, 12))}</code>`
+      const commitCell = line.previousCommitSha
+        ? (line.previousCommitWebUrl
+          ? `<a href="${escapeHtml(line.previousCommitWebUrl)}" target="_blank" rel="noopener"><code>${escapeHtml(line.previousCommitSha.slice(0, 12))}</code></a>`
+          : `<code>${escapeHtml(line.previousCommitSha.slice(0, 12))}</code>`)
         : `<span class="unresolved">${escapeHtml(line.unresolvedReason ?? "Unknown")}</span>`;
-      return `<tr><td class="ln">${line.lineNumber ?? ""}</td><td><code>${escapeHtml(line.text)}</code></td><td>${sha}</td></tr>`;
+
+      const mrCell = line.previousMergeRequest
+        ? `<a href="${escapeHtml(line.previousMergeRequest.webUrl ?? "")}" target="_blank" rel="noopener">!${line.previousMergeRequest.iid}</a>`
+        : `<span class="unresolved">-</span>`;
+
+      const issuesCell = (line.previousMergeRequestIssues && line.previousMergeRequestIssues.length > 0)
+        ? line.previousMergeRequestIssues
+          .map((issue) => `<a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a>`)
+          .join("<br />")
+        : `<span class="unresolved">-</span>`;
+
+      return `<tr><td class="ln">${line.lineNumber ?? ""}</td><td><code>${escapeHtml(line.text)}</code></td><td>${commitCell}</td><td>${mrCell}</td><td>${issuesCell}</td></tr>`;
     })
     .join("\n");
 }
@@ -37,7 +50,7 @@ function renderChunk(chunk: ReportChunk, index: number): string {
 
       <div class="block-title">Before commit (with previous commit per line)</div>
       <table class="code-table">
-        <thead><tr><th class="ln">Line</th><th>Code</th><th>Previous commit</th></tr></thead>
+        <thead><tr><th class="ln">Line</th><th>Code</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
         <tbody>${beforeRows || ""}</tbody>
       </table>
 

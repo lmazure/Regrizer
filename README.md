@@ -11,7 +11,10 @@ The report hierarchy is:
 5. For each chunk:
    - 7 lines before context
    - lines after commit (new side)
-   - lines before commit (old side) with previous-commit attribution per line
+   - lines before commit (old side) with:
+     - previous commit (clickable SHA to commit page)
+     - merge request link for that commit (when available)
+     - related issue links for that merge request
    - 7 lines after context
 
 ## Architecture
@@ -115,7 +118,24 @@ For each removed line with a valid old line number:
 
 - **REST** `GET /projects/:project_id/repository/files/:url_encoded_old_path/blame?ref=:first_parent_sha&range[start]=:line&range[end]=:line`
 
-The returned commit SHA is attached to that old-side line as `previousCommitSha`.
+Then, when a previous commit SHA is found, Regrizer enriches the row for links and related metadata:
+
+- **REST** `GET /projects/:project_id/repository/commits/:previous_commit_sha`
+  - used to link the SHA to the commit page (`web_url`)
+- **REST** `GET /projects/:project_id/repository/commits/:previous_commit_sha/merge_requests`
+  - used to resolve a related merged MR for the commit
+- **REST** `GET /projects/:mr_project_id/merge_requests/:mr_iid/closes_issues`
+  - used to list issues closed by the MR
+- **REST** `GET /projects/:mr_project_id/merge_requests/:mr_iid/related_issues`
+  - used to list issues related to the MR
+
+Issues from both endpoints are merged and deduplicated (with existing GraphQL fallback for `closes_issues` if needed).
+
+The resulting old-side table row includes:
+
+- previous commit (short SHA hyperlink)
+- merge request hyperlink (if found)
+- related issue hyperlinks (if found)
 
 ### 11) Render HTML report
 
