@@ -122,16 +122,21 @@ export function renderHtmlReport(result: AnalysisResult): string {
       .mr { padding: 14px; margin-top: 16px; }
       .commit { padding: 12px; margin-top: 10px; }
       .file { padding: 10px; margin-top: 10px; }
-      .chunk { padding: 10px; margin-top: 10px; }
+      .chunk { padding: 10px; margin-top: 10px; overflow-x: auto; }
       .chunk-title { font-weight: 600; margin-bottom: 6px; }
-      .code-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-      .code-table td, .code-table th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; }
+      .code-table { width: max-content; min-width: 100%; border-collapse: collapse; margin-bottom: 6px; table-layout: auto; }
+      .code-table td, .code-table th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; white-space: nowrap; }
       .ln { width: 70px; color: var(--muted); text-align: right; }
+      .code-table th:nth-child(2), .code-table td:nth-child(2) { min-width: 520px; }
+      .code-table th:nth-child(3), .code-table td:nth-child(3) { min-width: 520px; }
+      .code-table th:nth-child(4), .code-table td:nth-child(4) { min-width: 150px; }
+      .code-table th:nth-child(5), .code-table td:nth-child(5) { min-width: 120px; }
+      .code-table th:nth-child(6), .code-table td:nth-child(6) { min-width: 420px; }
       tr.row-added td { background: var(--after); }
       tr.row-removed td { background: var(--before); }
       tr.row-paired td { background: var(--paired); }
       tr.row-context td { background: var(--context); }
-      code { white-space: pre-wrap; word-break: break-word; font-family: "Consolas", "Courier New", monospace; }
+      code { white-space: pre; word-break: normal; font-family: "Consolas", "Courier New", monospace; }
       .unresolved { color: var(--warn); }
       a { color: #0a58ca; text-decoration: none; }
       a:hover { text-decoration: underline; }
