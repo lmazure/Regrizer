@@ -104,9 +104,7 @@ export function parseUnifiedDiffHunks(diff: string): ParsedDiffHunk[] {
       continue;
     }
 
-    const text = line.startsWith(" ") ? line.slice(1) : line;
-    current.beforeLines.push({ lineNumber: oldLine, text });
-    current.afterLines.push({ lineNumber: newLine, text });
+    // Unified diff context line: advances cursors but is not a modified line.
     oldLine += 1;
     newLine += 1;
   }
