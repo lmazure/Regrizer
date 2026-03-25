@@ -1,20 +1,22 @@
-import { extractChangedNewLineNumbers } from "./diffParser.js";
+import { parseUnifiedDiffHunks } from "./diffParser.js";
 import { GitLabClient } from "./gitlabClient.js";
 import { Logger } from "./logger.js";
 import {
   AnalysisResult,
-  FileAnalysis,
+  GitLabCommitDetail,
+  GitLabCommitDiff,
   GitLabMergeRequest,
   GitLabMergeRequestRef,
-  LineProvenance,
   ParsedIssueUrl,
-  RelatedIssueRef,
+  ReportChunk,
+  ReportCommit,
+  ReportCommitFile,
+  ReportLine,
+  ReportMergeRequest,
 } from "./types.js";
-import { chunkSortedNumbers } from "./utils.js";
 
 export class IssueAnalyzer {
-  private readonly mrByCommitCache = new Map<string, GitLabMergeRequestRef | null>();
-  private readonly issuesByMrCache = new Map<string, RelatedIssueRef[]>();
+  private readonly blameCache = new Map<string, string | null>();
 
   constructor(private readonly client: GitLabClient, private readonly logger: Logger) {}
 
@@ -29,23 +31,26 @@ export class IssueAnalyzer {
     const mergedMrrs = await this.loadMergedMergeRequests(relatedRefs);
     this.logger.log(`Found ${mergedMrrs.length} merged related MR(s)`);
 
-    const files: FileAnalysis[] = [];
+    const mergeRequests: ReportMergeRequest[] = [];
     for (const mr of mergedMrrs) {
       this.logger.log(`Analyzing MR !${mr.iid} (${mr.project_id})`);
-      const fileAnalyses = await this.analyzeMergeRequest(mr);
-      files.push(...fileAnalyses);
+      const commits = await this.analyzeMergeRequestCommits(mr);
+      mergeRequests.push({
+        mr: {
+          projectId: mr.project_id,
+          iid: mr.iid,
+          title: mr.title,
+          webUrl: mr.web_url,
+        },
+        mergedAt: mr.merged_at,
+        commits,
+      });
     }
 
     return {
       inputIssue: issue,
       project,
-      analyzedMergeRequests: mergedMrrs.map((mr) => ({
-        projectId: mr.project_id,
-        iid: mr.iid,
-        title: mr.title,
-        webUrl: mr.web_url,
-      })),
-      files,
+      mergeRequests,
       generatedAt: new Date().toISOString(),
     };
   }
@@ -68,211 +73,190 @@ export class IssueAnalyzer {
     merged.sort((a, b) => {
       const left = a.merged_at ? new Date(a.merged_at).getTime() : 0;
       const right = b.merged_at ? new Date(b.merged_at).getTime() : 0;
-      return left - right;
+      return right - left;
     });
 
     return merged;
   }
 
-  private async analyzeMergeRequest(mr: GitLabMergeRequest): Promise<FileAnalysis[]> {
-    const changes = await this.client.getMergeRequestChanges(mr.project_id, mr.iid);
-    this.logger.log(`MR !${mr.iid}: ${changes.length} changed file(s)`);
-    const result: FileAnalysis[] = [];
+  private async analyzeMergeRequestCommits(mr: GitLabMergeRequest): Promise<ReportCommit[]> {
+    const mergedCommitRef = this.resolveMergedTargetBranchCommit(mr);
+    if (!mergedCommitRef) {
+      this.logger.log(`MR !${mr.iid}: no merge target-branch commit SHA available`);
+      return [];
+    }
 
-    for (const change of changes) {
-      const filePath = change.new_path;
-      const mergeRequestRef: GitLabMergeRequestRef = {
-        projectId: mr.project_id,
-        iid: mr.iid,
-        title: mr.title,
-        webUrl: mr.web_url,
-      };
+    this.logger.log(
+      `MR !${mr.iid}: using target-branch merge commit ${mergedCommitRef.sha.slice(0, 12)} (${mergedCommitRef.source})`,
+    );
 
-      if (change.deleted_file) {
-        result.push({
-          filePath,
-          mergeRequest: mergeRequestRef,
-          contextWindows: [],
-          skippedReason: "Deleted file",
-        });
-        continue;
-      }
+    const detail = await this.safeGetCommitDetail(mr.project_id, mergedCommitRef.sha);
+    if (!detail) {
+      this.logger.log(`MR !${mr.iid}: failed to load commit ${mergedCommitRef.sha}`);
+      return [];
+    }
 
-      if (!change.diff || change.diff.trim().length === 0) {
-        result.push({
-          filePath,
-          mergeRequest: mergeRequestRef,
-          contextWindows: [],
-          skippedReason: "Binary or unavailable diff",
-        });
-        continue;
-      }
+    const files = await this.analyzeCommitFiles(mr.project_id, detail);
+    return [{
+      sha: detail.id,
+      shortSha: detail.short_id || detail.id.slice(0, 12),
+      title: detail.title,
+      message: detail.message,
+      committedAt: detail.committed_date,
+      webUrl: detail.web_url,
+      parentIds: detail.parent_ids ?? [],
+      files,
+    }];
+  }
 
-      const changedLines = extractChangedNewLineNumbers(change.diff);
-      if (changedLines.length === 0) {
-        continue;
-      }
+  private resolveMergedTargetBranchCommit(mr: GitLabMergeRequest): { sha: string; source: string } | null {
+    if (mr.merge_commit_sha) {
+      return { sha: mr.merge_commit_sha, source: "merge_commit_sha" };
+    }
 
-      this.logger.log(`MR !${mr.iid}: ${filePath} has ${changedLines.length} changed line(s)`);
+    if (mr.squash_commit_sha) {
+      return { sha: mr.squash_commit_sha, source: "squash_commit_sha" };
+    }
 
-      const ref = mr.merge_commit_sha ?? mr.target_branch;
-      const raw = await this.safeReadFile(mr.project_id, filePath, ref);
-      if (raw === null) {
-        result.push({
-          filePath,
-          mergeRequest: mergeRequestRef,
-          contextWindows: [],
-          skippedReason: `Could not read file at ref ${ref}`,
-        });
-        continue;
-      }
+    if (mr.sha) {
+      return { sha: mr.sha, source: "sha (fast-forward fallback)" };
+    }
 
-      const allLines = raw.split(/\r?\n/);
-      const chunks = chunkSortedNumbers(changedLines, 7);
+    return null;
+  }
 
-      const windows = [] as FileAnalysis["contextWindows"];
-      for (const chunk of chunks) {
-        const end = Math.min(chunk.end, allLines.length);
-        const lines = [] as Array<{ lineNumber: number; text: string; isChanged: boolean }>;
-        for (let lineNumber = chunk.start; lineNumber <= end; lineNumber += 1) {
-          lines.push({
-            lineNumber,
-            text: allLines[lineNumber - 1] ?? "",
-            isChanged: chunk.changed.includes(lineNumber),
+  private async analyzeCommitFiles(projectId: number, commit: GitLabCommitDetail): Promise<ReportCommitFile[]> {
+    const diffs = await this.client.getCommitDiffs(projectId, commit.id);
+    const files: ReportCommitFile[] = [];
+
+    for (const diff of diffs) {
+      files.push(await this.analyzeCommitFile(projectId, commit, diff));
+    }
+
+    return files;
+  }
+
+  private async analyzeCommitFile(projectId: number, commit: GitLabCommitDetail, diff: GitLabCommitDiff): Promise<ReportCommitFile> {
+    const filePath = diff.new_path;
+    const oldPath = diff.old_path;
+
+    if (!diff.diff || diff.diff.trim().length === 0) {
+      return { filePath, oldPath, chunks: [], skippedReason: "Binary or unavailable diff" };
+    }
+
+    const hunks = parseUnifiedDiffHunks(diff.diff);
+    if (hunks.length === 0) {
+      return { filePath, oldPath, chunks: [], skippedReason: "No parseable hunks" };
+    }
+
+    const postLines = await this.safeReadFileLines(projectId, filePath, commit.id);
+    const parentRef = (commit.parent_ids && commit.parent_ids.length > 0) ? commit.parent_ids[0] : null;
+    const preLines = parentRef ? await this.safeReadFileLines(projectId, oldPath, parentRef) : null;
+
+    const chunks: ReportChunk[] = [];
+    for (const hunk of hunks) {
+      const contextBefore = this.pickContextBefore(postLines, hunk.newStart, 7);
+      const contextAfter = this.pickContextAfter(postLines, hunk.newStart + hunk.newCount - 1, 7);
+
+      const afterLines: ReportLine[] = hunk.afterLines.map((line) => ({
+        lineNumber: line.lineNumber,
+        text: line.lineNumber && postLines ? (postLines[line.lineNumber - 1] ?? line.text) : line.text,
+      }));
+
+      const beforeLines: ReportLine[] = [];
+      for (const line of hunk.beforeLines) {
+        if (!line.lineNumber || !parentRef) {
+          beforeLines.push({
+            lineNumber: line.lineNumber,
+            text: line.text,
+            previousCommitSha: null,
+            unresolvedReason: "No parent commit",
           });
+          continue;
         }
 
-        const provenanceByChangedLine: LineProvenance[] = [];
-        for (const changedLineNumber of chunk.changed) {
-          const lineBeforeNumber = changedLineNumber - 1;
-          const lineAfterNumber = changedLineNumber + 1;
+        const text = line.lineNumber && preLines ? (preLines[line.lineNumber - 1] ?? line.text) : line.text;
+        const previousCommitSha = await this.resolvePreviousCommitForPreLine(projectId, oldPath, parentRef, line.lineNumber);
 
-          const lineBeforeText = lineBeforeNumber >= 1 ? allLines[lineBeforeNumber - 1] ?? null : null;
-          const changedLineText = allLines[changedLineNumber - 1] ?? "";
-          const lineAfterText = lineAfterNumber <= allLines.length ? allLines[lineAfterNumber - 1] ?? null : null;
-
-          const provenance = await this.resolveLineBeforeProvenance(
-            mr.project_id,
-            filePath,
-            ref,
-            lineBeforeNumber,
-            lineBeforeText,
-          );
-
-          provenanceByChangedLine.push({
-            lineBeforeNumber: lineBeforeNumber >= 1 ? lineBeforeNumber : null,
-            lineBeforeText,
-            changedLineNumber,
-            changedLineText,
-            lineAfterNumber: lineAfterNumber <= allLines.length ? lineAfterNumber : null,
-            lineAfterText,
-            introducingCommitSha: provenance.introducingCommitSha,
-            introducingMr: provenance.introducingMr,
-            introducingIssues: provenance.introducingIssues,
-            unresolvedReason: provenance.unresolvedReason,
-          });
-        }
-
-        windows.push({
-          startLine: chunk.start,
-          endLine: end,
-          changedLineNumbers: [...chunk.changed],
-          lines,
-          provenanceByChangedLine,
+        beforeLines.push({
+          lineNumber: line.lineNumber,
+          text,
+          previousCommitSha,
+          unresolvedReason: previousCommitSha ? undefined : "Blame did not return a commit",
         });
       }
 
-      result.push({
-        filePath,
-        mergeRequest: mergeRequestRef,
-        contextWindows: windows,
+      chunks.push({
+        oldStart: hunk.oldStart,
+        oldCount: hunk.oldCount,
+        newStart: hunk.newStart,
+        newCount: hunk.newCount,
+        contextBefore,
+        afterLines,
+        beforeLines,
+        contextAfter,
       });
     }
 
-    return result;
+    return { filePath, oldPath, chunks };
   }
 
-  private async resolveLineBeforeProvenance(
+  private pickContextBefore(lines: string[] | null, startLine: number, radius: number): ReportLine[] {
+    if (!lines) {
+      return [];
+    }
+
+    const from = Math.max(1, startLine - radius);
+    const to = Math.max(0, startLine - 1);
+    const out: ReportLine[] = [];
+    for (let lineNo = from; lineNo <= to; lineNo += 1) {
+      out.push({ lineNumber: lineNo, text: lines[lineNo - 1] ?? "" });
+    }
+    return out;
+  }
+
+  private pickContextAfter(lines: string[] | null, endLine: number, radius: number): ReportLine[] {
+    if (!lines) {
+      return [];
+    }
+
+    const from = endLine + 1;
+    const to = Math.min(lines.length, endLine + radius);
+    const out: ReportLine[] = [];
+    for (let lineNo = from; lineNo <= to; lineNo += 1) {
+      out.push({ lineNumber: lineNo, text: lines[lineNo - 1] ?? "" });
+    }
+    return out;
+  }
+
+  private async resolvePreviousCommitForPreLine(
     projectId: number,
     filePath: string,
-    ref: string,
-    lineBeforeNumber: number,
-    lineBeforeText: string | null,
-  ): Promise<{
-    introducingCommitSha: string | null;
-    introducingMr: GitLabMergeRequestRef | null;
-    introducingIssues: RelatedIssueRef[];
-    unresolvedReason?: string;
-  }> {
-    if (lineBeforeNumber < 1 || lineBeforeText === null) {
-      return {
-        introducingCommitSha: null,
-        introducingMr: null,
-        introducingIssues: [],
-        unresolvedReason: "No line before available",
-      };
+    parentRef: string,
+    lineNumber: number,
+  ): Promise<string | null> {
+    const key = `${projectId}:${filePath}:${parentRef}:${lineNumber}`;
+    if (this.blameCache.has(key)) {
+      return this.blameCache.get(key)!;
     }
 
-    const commitSha = await this.client.getBlameCommitShaForLine(projectId, filePath, ref, lineBeforeNumber);
-    if (!commitSha) {
-      return {
-        introducingCommitSha: null,
-        introducingMr: null,
-        introducingIssues: [],
-        unresolvedReason: "Blame did not return a commit",
-      };
-    }
-
-    const introducingMr = await this.resolveMergeRequestForCommit(projectId, commitSha);
-    if (!introducingMr) {
-      return {
-        introducingCommitSha: commitSha,
-        introducingMr: null,
-        introducingIssues: [],
-        unresolvedReason: "No merged MR found for commit",
-      };
-    }
-
-    const issues = await this.resolveIssuesForMergeRequest(introducingMr.projectId, introducingMr.iid);
-
-    return {
-      introducingCommitSha: commitSha,
-      introducingMr,
-      introducingIssues: issues,
-    };
+    const sha = await this.client.getBlameCommitShaForLine(projectId, filePath, parentRef, lineNumber);
+    this.blameCache.set(key, sha);
+    return sha;
   }
 
-  private async resolveMergeRequestForCommit(projectId: number, commitSha: string): Promise<GitLabMergeRequestRef | null> {
-    const key = `${projectId}:${commitSha}`;
-    if (this.mrByCommitCache.has(key)) {
-      return this.mrByCommitCache.get(key)!;
-    }
-
-    const related = await this.client.getMergeRequestsForCommit(projectId, commitSha);
-    const picked = related[0] ?? null;
-    this.logger.log(
-      picked
-        ? `Commit ${commitSha.slice(0, 12)} mapped to MR !${picked.iid} (${picked.projectId})`
-        : `Commit ${commitSha.slice(0, 12)} has no merged MR mapping`,
-    );
-    this.mrByCommitCache.set(key, picked);
-    return picked;
-  }
-
-  private async resolveIssuesForMergeRequest(projectId: number, mrIid: number): Promise<RelatedIssueRef[]> {
-    const key = `${projectId}:${mrIid}`;
-    if (this.issuesByMrCache.has(key)) {
-      return this.issuesByMrCache.get(key)!;
-    }
-
-    const issues = await this.client.getIssuesClosedByMergeRequest(projectId, mrIid);
-    this.issuesByMrCache.set(key, issues);
-    return issues;
-  }
-
-  private async safeReadFile(projectId: number, filePath: string, ref: string): Promise<string | null> {
+  private async safeReadFileLines(projectId: number, filePath: string, ref: string): Promise<string[] | null> {
     try {
-      return await this.client.getFileRaw(projectId, filePath, ref);
+      const raw = await this.client.getFileRaw(projectId, filePath, ref);
+      return raw.split(/\r?\n/);
+    } catch {
+      return null;
+    }
+  }
+
+  private async safeGetCommitDetail(projectId: number, sha: string): Promise<GitLabCommitDetail | null> {
+    try {
+      return await this.client.getCommit(projectId, sha);
     } catch {
       return null;
     }

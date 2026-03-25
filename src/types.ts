@@ -4,6 +4,8 @@ export interface ParsedIssueUrl {
   issueIid: number;
 }
 
+export interface GitLabCommitDiff extends GitLabMrChange {}
+
 export interface GitLabProject {
   id: number;
   path_with_namespace: string;
@@ -26,7 +28,24 @@ export interface GitLabMergeRequestRef {
 
 export interface GitLabCommitRef {
   id: string;
+  short_id?: string;
+  title?: string;
+  message?: string;
+  authored_date?: string;
+  committed_date?: string;
+  parent_ids?: string[];
   web_url?: string;
+}
+
+export interface GitLabCommitDetail {
+  id: string;
+  short_id: string;
+  title: string;
+  message: string;
+  authored_date: string;
+  committed_date: string;
+  parent_ids: string[];
+  web_url: string;
 }
 
 export interface GitLabMergeRequest {
@@ -38,6 +57,8 @@ export interface GitLabMergeRequest {
   state: string;
   merged_at: string | null;
   merge_commit_sha: string | null;
+  squash_commit_sha?: string | null;
+  sha?: string;
   target_branch: string;
   source_branch: string;
   description: string | null;
@@ -70,23 +91,51 @@ export interface LineProvenance {
   unresolvedReason?: string;
 }
 
-export interface FileAnalysis {
+export interface ReportLine {
+  lineNumber: number | null;
+  text: string;
+  previousCommitSha?: string | null;
+  unresolvedReason?: string;
+}
+
+export interface ReportChunk {
+  oldStart: number;
+  oldCount: number;
+  newStart: number;
+  newCount: number;
+  contextBefore: ReportLine[];
+  afterLines: ReportLine[];
+  beforeLines: ReportLine[];
+  contextAfter: ReportLine[];
+}
+
+export interface ReportCommitFile {
   filePath: string;
-  mergeRequest: GitLabMergeRequestRef;
-  contextWindows: Array<{
-    startLine: number;
-    endLine: number;
-    changedLineNumbers: number[];
-    lines: Array<{ lineNumber: number; text: string; isChanged: boolean }>;
-    provenanceByChangedLine: LineProvenance[];
-  }>;
+  oldPath: string;
+  chunks: ReportChunk[];
   skippedReason?: string;
+}
+
+export interface ReportCommit {
+  sha: string;
+  shortSha: string;
+  title: string;
+  message: string;
+  committedAt: string;
+  webUrl: string;
+  parentIds: string[];
+  files: ReportCommitFile[];
+}
+
+export interface ReportMergeRequest {
+  mr: GitLabMergeRequestRef;
+  mergedAt: string | null;
+  commits: ReportCommit[];
 }
 
 export interface AnalysisResult {
   inputIssue: GitLabIssue;
   project: GitLabProject;
-  analyzedMergeRequests: GitLabMergeRequestRef[];
-  files: FileAnalysis[];
+  mergeRequests: ReportMergeRequest[];
   generatedAt: string;
 }

@@ -1,4 +1,6 @@
 import {
+  GitLabCommitDetail,
+  GitLabCommitDiff,
   GitLabCommitRef,
   GitLabIssue,
   GitLabMergeRequest,
@@ -141,6 +143,14 @@ export class GitLabClient {
 
   async getMergeRequestCommits(projectId: number, mrIid: number): Promise<GitLabCommitRef[]> {
     return this.requestJson<GitLabCommitRef[]>(`/projects/${projectId}/merge_requests/${mrIid}/commits`);
+  }
+
+  async getCommit(projectId: number, sha: string): Promise<GitLabCommitDetail> {
+    return this.requestJson<GitLabCommitDetail>(`/projects/${projectId}/repository/commits/${sha}`);
+  }
+
+  async getCommitDiffs(projectId: number, sha: string): Promise<GitLabCommitDiff[]> {
+    return this.requestJson<GitLabCommitDiff[]>(`/projects/${projectId}/repository/commits/${sha}/diff`);
   }
 
   async getFileRaw(projectId: number, filePath: string, ref: string): Promise<string> {
