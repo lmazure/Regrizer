@@ -163,8 +163,14 @@ export class IssueAnalyzer {
 
     const chunks: ReportChunk[] = [];
     for (const hunk of hunks) {
-      const contextBefore = this.pickContextBefore(postLines, hunk.newStart, 7);
-      const contextAfter = this.pickContextAfter(postLines, hunk.newStart + hunk.newCount - 1, 7);
+      const contextBefore = [
+        ...this.pickContextBefore(postLines, hunk.newStart, 7),
+        ...this.mapNewSideLines(hunk.leadingContextNew, postLines),
+      ];
+      const contextAfter = [
+        ...this.mapNewSideLines(hunk.trailingContextNew, postLines),
+        ...this.pickContextAfter(postLines, hunk.newStart + hunk.newCount - 1, 7),
+      ];
 
       const afterLines: ReportLine[] = hunk.afterLines.map((line) => ({
         lineNumber: line.lineNumber,
@@ -227,6 +233,13 @@ export class IssueAnalyzer {
       out.push({ lineNumber: lineNo, text: lines[lineNo - 1] ?? "" });
     }
     return out;
+  }
+
+  private mapNewSideLines(lines: Array<{ lineNumber: number | null; text: string }>, postLines: string[] | null): ReportLine[] {
+    return lines.map((line) => ({
+      lineNumber: line.lineNumber,
+      text: line.lineNumber && postLines ? (postLines[line.lineNumber - 1] ?? line.text) : line.text,
+    }));
   }
 
   private pickContextAfter(lines: string[] | null, endLine: number, radius: number): ReportLine[] {

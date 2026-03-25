@@ -10,11 +10,13 @@ The report hierarchy is:
 4. Diff chunks per file
 5. For each chunk:
    - 7 lines before context
-   - lines after commit (new side)
-   - lines before commit (old side) with:
+   - unchanged leading hunk context lines (from GitLab diff)
+   - lines after commit (new side, `+` lines only)
+   - lines before commit (old side, `-` lines only) with:
      - previous commit (clickable SHA to commit page)
      - merge request link for that commit (when available)
      - related issue links for that merge request
+   - unchanged trailing hunk context lines (from GitLab diff)
    - 7 lines after context
 
 ## Architecture
@@ -99,7 +101,8 @@ Local parsing with unified hunk headers, producing:
 
 - old range (`oldStart`, `oldCount`)
 - new range (`newStart`, `newCount`)
-- old-side removed lines and new-side added lines
+- old-side removed lines (`-`) and new-side added lines (`+`)
+- leading/trailing unchanged hunk context lines (space-prefixed in unified diff)
 
 ### 9) Fetch file contents for context windows
 
@@ -110,7 +113,7 @@ For each changed file:
 - Pre-image (before commit), when parent exists:
   - **REST** [`GET /projects/:project_id/repository/files/:url_encoded_old_path/raw?ref=:first_parent_sha`](https://docs.gitlab.com/api/repository_files/#retrieve-a-raw-file-from-a-repository)
 
-Used to render 7 lines before/after plus exact before/after lines for chunk content.
+Used to render 7 lines before/after plus exact chunk lines. Unchanged hunk boundary lines are rendered in context tables; modified tables only show real additions/removals.
 
 ### 10) Attribute previous commit per old-side line
 

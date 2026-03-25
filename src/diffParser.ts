@@ -10,6 +10,8 @@ export interface ParsedDiffHunk {
   oldCount: number;
   newStart: number;
   newCount: number;
+  leadingContextNew: ParsedDiffLine[];
+  trailingContextNew: ParsedDiffLine[];
   beforeLines: ParsedDiffLine[];
   afterLines: ParsedDiffLine[];
 }
@@ -62,6 +64,8 @@ export function parseUnifiedDiffHunks(diff: string): ParsedDiffHunk[] {
   let current: ParsedDiffHunk | null = null;
   let oldLine = 0;
   let newLine = 0;
+  let seenModification = false;
+  let trailingContextCandidate: ParsedDiffLine[] = [];
 
   for (const line of lines) {
     if (line.startsWith("@@")) {
@@ -82,9 +86,13 @@ export function parseUnifiedDiffHunks(diff: string): ParsedDiffHunk[] {
         oldCount: Number(header[2] ?? "1"),
         newStart: newLine,
         newCount: Number(header[4] ?? "1"),
+        leadingContextNew: [],
+        trailingContextNew: [],
         beforeLines: [],
         afterLines: [],
       };
+      seenModification = false;
+      trailingContextCandidate = [];
       continue;
     }
 
@@ -93,15 +101,31 @@ export function parseUnifiedDiffHunks(diff: string): ParsedDiffHunk[] {
     }
 
     if (line.startsWith("+")) {
+      seenModification = true;
+      trailingContextCandidate = [];
       current.afterLines.push({ lineNumber: newLine, text: line.slice(1) });
       newLine += 1;
       continue;
     }
 
     if (line.startsWith("-")) {
+      seenModification = true;
+      trailingContextCandidate = [];
       current.beforeLines.push({ lineNumber: oldLine, text: line.slice(1) });
       oldLine += 1;
       continue;
+    }
+
+    const contextText = line.startsWith(" ") ? line.slice(1) : line;
+    const contextLine: ParsedDiffLine = {
+      lineNumber: newLine,
+      text: contextText,
+    };
+    if (!seenModification) {
+      current.leadingContextNew.push(contextLine);
+    } else {
+      trailingContextCandidate.push(contextLine);
+      current.trailingContextNew = [...trailingContextCandidate];
     }
 
     // Unified diff context line: advances cursors but is not a modified line.

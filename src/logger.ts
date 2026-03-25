@@ -7,6 +7,6 @@ export class Logger {
     }
 
     const timestamp = new Date().toISOString();
-    process.stdout.write(`[verbose ${timestamp}] ${message}\n`);
+    process.stdout.write(`[${timestamp}] ${message}\n`);
   }
 }
