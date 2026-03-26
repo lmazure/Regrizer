@@ -16,8 +16,10 @@ The report hierarchy is:
      - previous commit
      - merge request
      - related issues
+   - previous commit / merge request / related issues cells are vertically merged when consecutive rows have the same value
    - unchanged rows fill only line number + code-after columns
    - changed rows fill before/provenance columns when applicable
+6. Every hierarchy level (MR, commit, file, chunk) is collapsible and expanded by default when the report opens
 
 ## Architecture
 
@@ -144,7 +146,13 @@ Rows with old-side (`-`) lines include:
 
 No API call in this step.
 
-The renderer outputs nested sections for MR -> commit -> file -> chunk, with one color-coded unified table per chunk (`context`, `paired`, `added`, `removed` rows).
+The renderer outputs nested `details/summary` sections for MR -> commit -> file -> chunk (all `open` by default), with one color-coded unified table per chunk (`context`, `paired`, `added`, `removed` rows).
+
+For readability, repeated consecutive values in these provenance columns are rendered as merged cells (`rowspan`) within each chunk table:
+
+- previous commit
+- merge request
+- related issues
 
 ## Requirements
 
