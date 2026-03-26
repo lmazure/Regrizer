@@ -11,6 +11,11 @@ interface CliArgs {
   verbose: boolean;
 }
 
+interface FailedIssueAnalysis {
+  issueUrl: string;
+  errorMessage: string;
+}
+
 function parseArgs(argv: string[]): CliArgs {
   const args = new Map<string, string>();
   const issueUrls: string[] = [];
@@ -19,6 +24,7 @@ function parseArgs(argv: string[]): CliArgs {
   for (let index = 2; index < argv.length; index += 1) {
     const value = argv[index];
     if (!value.startsWith("--")) {
+      issueUrls.push(value);
       continue;
     }
 
@@ -62,19 +68,30 @@ async function run(): Promise<void> {
   const logger = new Logger(verbose);
   logger.log(`Starting analysis for ${issueUrls.length} issue(s)`);
   const results = [];
+  const failedIssues: FailedIssueAnalysis[] = [];
 
   for (const [index, issueUrl] of issueUrls.entries()) {
-    const parsed = parseGitLabIssueUrl(issueUrl);
     logger.log(`Analyzing issue ${index + 1}/${issueUrls.length}: ${issueUrl}`);
+    try {
+      const parsed = parseGitLabIssueUrl(issueUrl);
+      const client = new GitLabClient(parsed.host, token, logger);
+      const analyzer = new IssueAnalyzer(client, logger);
 
-    const client = new GitLabClient(parsed.host, token, logger);
-    const analyzer = new IssueAnalyzer(client, logger);
-
-    const result = await analyzer.analyze(parsed);
-    results.push(result);
+      const result = await analyzer.analyze(parsed);
+      results.push(result);
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+      failedIssues.push({ issueUrl, errorMessage });
+      logger.log(`Issue analysis failed for ${issueUrl}: ${errorMessage}`);
+      process.stderr.write(`Issue failed: ${issueUrl}\n  ${errorMessage}\n`);
+    }
   }
 
-  const html = renderHtmlReports(results);
+  if (results.length === 0 && failedIssues.length > 0) {
+    throw new Error("All input issues failed to analyze");
+  }
+
+  const html = renderHtmlReports(results, failedIssues);
   await writeFile(output, html, "utf-8");
   logger.log(`HTML report written to ${output}`);
   process.stdout.write(`Report generated: ${output}\n`);

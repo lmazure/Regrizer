@@ -1,6 +1,11 @@
 import { AnalysisResult, ReportChunk, ReportCommit, ReportCommitFile, ReportMergeRequest } from "./types.js";
 import { escapeHtml } from "./utils.js";
 
+interface FailedIssueRenderItem {
+  issueUrl: string;
+  errorMessage: string;
+}
+
 function renderChunkRows(chunk: ReportChunk): string {
   const commitValues = chunk.rows.map((row) => row.previousCommitSha
     ? (row.previousCommitWebUrl
@@ -54,6 +59,16 @@ function renderChunk(chunk: ReportChunk, index: number): string {
         <thead><tr><th class="ln">Line</th><th>Code after commit</th><th>Code before commit</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
         <tbody>${rows || ""}</tbody>
       </table>
+    </details>
+  `;
+}
+
+function renderFailedIssueSection(item: FailedIssueRenderItem, index: number): string {
+  return `
+    <details class="issue-section issue failed-issue" open>
+      <summary><h2>Issue ${index + 1} (failed)</h2></summary>
+      <div class="meta"><span class="label">Issue URL</span> <a href="${escapeHtml(item.issueUrl)}" target="_blank" rel="noopener">${escapeHtml(item.issueUrl)}</a></div>
+      <div class="meta unresolved"><span class="label">Error</span> ${escapeHtml(item.errorMessage)}</div>
     </details>
   `;
 }
@@ -115,14 +130,13 @@ function renderIssueSection(result: AnalysisResult, index: number): string {
     .join("\n");
 
   return `
-    <section class="issue-section">
-      <h2>Issue ${index + 1}</h2>
-      <div class="meta"><span class="label">Issue</span> <a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${result.inputIssue.iid} - ${escapeHtml(result.inputIssue.title)}</a></div>
+    <details class="issue-section issue" open>
+      <summary><h2>Issue <a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${result.inputIssue.iid}</a> - ${escapeHtml(result.inputIssue.title)}</h2></summary>
       <div class="meta"><span class="label">Project</span> <a href="${escapeHtml(result.project.web_url)}" target="_blank" rel="noopener">${escapeHtml(result.project.path_with_namespace)}</a></div>
       <div class="meta"><span class="label">Merged MRs analyzed</span> ${result.mergeRequests.length}</div>
       <div class="meta"><span class="label">Generated at</span> ${escapeHtml(result.generatedAt)}</div>
       ${mrSections || '<div class="mr"><div class="meta">No related merged MRs found.</div></div>'}
-    </section>
+    </details>
   `;
 }
 
@@ -130,9 +144,17 @@ export function renderHtmlReport(result: AnalysisResult): string {
   return renderHtmlReports([result]);
 }
 
-export function renderHtmlReports(results: AnalysisResult[]): string {
-  const issueSections = results
+export function renderHtmlReports(results: AnalysisResult[], failedIssues: FailedIssueRenderItem[] = []): string {
+  const successSections = results
     .map((result, index) => renderIssueSection(result, index))
+    .join("\n");
+
+  const failedSections = failedIssues
+    .map((item, index) => renderFailedIssueSection(item, results.length + index))
+    .join("\n");
+
+  const issueSections = [successSections, failedSections]
+    .filter((section) => section.length > 0)
     .join("\n");
 
   return `<!doctype html>
@@ -156,8 +178,10 @@ export function renderHtmlReports(results: AnalysisResult[]): string {
       }
       body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--fg); }
       main { width: 100%; max-width: none; margin: 0; padding: 12px; box-sizing: border-box; }
-      .issue-section { margin-top: 20px; }
+      .issue-section { margin-top: 20px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
       .issue-section:first-of-type { margin-top: 0; }
+      .issue { display: block; }
+      .issue > summary { font-weight: 600; }
       h1, h2, h3, h4, h5 { margin: 0 0 8px 0; }
       .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 8px; }
       .mr, .commit, .file, .chunk { background: var(--card); border: 1px solid var(--line); border-radius: 10px; }

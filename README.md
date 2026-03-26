@@ -146,7 +146,9 @@ Rows with old-side (`-`) lines include:
 
 No API call in this step.
 
-The renderer outputs nested `details/summary` sections for MR -> commit -> file -> chunk (all `open` by default), with one color-coded unified table per chunk (`context`, `paired`, `added`, `removed` rows).
+The renderer outputs nested `details/summary` sections for issue -> MR -> commit -> file -> chunk (all `open` by default), with one color-coded unified table per chunk (`context`, `paired`, `added`, `removed` rows).
+
+Each issue section title is rendered from issue data (for example, `Issue #6380 - <issue title>`) instead of generic numbering.
 
 For readability, repeated consecutive values in these provenance columns are rendered as merged cells (`rowspan`) within each chunk table:
 
@@ -181,7 +183,15 @@ node dist/src/cli.js \
   --output report.html
 ```
 
+Additional issue URLs can also be passed positionally after the first `--issue-url` value:
+
+```bash
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" "https://gitlab.example.com/group/project/-/issues/456" --output report.html
+```
+
 The generated `--output` file will contain one section per input issue.
+
+If one issue fails (for example, 404 not found), Regrizer continues analyzing the remaining issues, logs the failure to stderr, and includes a failed-issue section in the final HTML report.
 
 Add `--verbose` to print progress logs in the terminal:
 
