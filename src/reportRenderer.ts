@@ -2,25 +2,44 @@ import { AnalysisResult, ReportChunk, ReportCommit, ReportCommitFile, ReportMerg
 import { escapeHtml } from "./utils.js";
 
 function renderChunkRows(chunk: ReportChunk): string {
+  const commitValues = chunk.rows.map((row) => row.previousCommitSha
+    ? (row.previousCommitWebUrl
+      ? `<a href="${escapeHtml(row.previousCommitWebUrl)}" target="_blank" rel="noopener"><code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code></a>`
+      : `<code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code>`)
+    : (row.unresolvedReason ? `<span class="unresolved">${escapeHtml(row.unresolvedReason)}</span>` : ""));
+
+  const mrValues = chunk.rows.map((row) => row.previousMergeRequest
+    ? `<a href="${escapeHtml(row.previousMergeRequest.webUrl ?? "")}" target="_blank" rel="noopener">!${row.previousMergeRequest.iid}</a>`
+    : "");
+
+  const issuesValues = chunk.rows.map((row) => (row.previousMergeRequestIssues && row.previousMergeRequestIssues.length > 0)
+    ? row.previousMergeRequestIssues
+      .map((issue) => `<a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a>`)
+      .join("<br />")
+    : "");
+
+  const getRowSpan = (values: string[], startIndex: number): number => {
+    const current = values[startIndex];
+    let span = 1;
+    while (startIndex + span < values.length && values[startIndex + span] === current) {
+      span += 1;
+    }
+    return span;
+  };
+
   return chunk.rows
-    .map((row) => {
-      const commitCell = row.previousCommitSha
-        ? (row.previousCommitWebUrl
-          ? `<a href="${escapeHtml(row.previousCommitWebUrl)}" target="_blank" rel="noopener"><code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code></a>`
-          : `<code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code>`)
-        : (row.unresolvedReason ? `<span class="unresolved">${escapeHtml(row.unresolvedReason)}</span>` : "");
-
-      const mrCell = row.previousMergeRequest
-        ? `<a href="${escapeHtml(row.previousMergeRequest.webUrl ?? "")}" target="_blank" rel="noopener">!${row.previousMergeRequest.iid}</a>`
+    .map((row, index) => {
+      const commitCell = index === 0 || commitValues[index] !== commitValues[index - 1]
+        ? `<td class="provenance provenance-commit" rowspan="${getRowSpan(commitValues, index)}">${commitValues[index]}</td>`
+        : "";
+      const mrCell = index === 0 || mrValues[index] !== mrValues[index - 1]
+        ? `<td class="provenance provenance-mr" rowspan="${getRowSpan(mrValues, index)}">${mrValues[index]}</td>`
+        : "";
+      const issuesCell = index === 0 || issuesValues[index] !== issuesValues[index - 1]
+        ? `<td class="provenance provenance-issues" rowspan="${getRowSpan(issuesValues, index)}">${issuesValues[index]}</td>`
         : "";
 
-      const issuesCell = (row.previousMergeRequestIssues && row.previousMergeRequestIssues.length > 0)
-        ? row.previousMergeRequestIssues
-          .map((issue) => `<a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a>`)
-          .join("<br />")
-        : "";
-
-      return `<tr class="row-${row.rowKind}"><td class="ln">${row.lineNumber ?? ""}</td><td><code>${escapeHtml(row.afterText)}</code></td><td><code>${escapeHtml(row.beforeText ?? "")}</code></td><td>${commitCell}</td><td>${mrCell}</td><td>${issuesCell}</td></tr>`;
+      return `<tr class="row-${row.rowKind}"><td class="ln">${row.lineNumber ?? ""}</td><td><code>${escapeHtml(row.afterText)}</code></td><td><code>${escapeHtml(row.beforeText ?? "")}</code></td>${commitCell}${mrCell}${issuesCell}</tr>`;
     })
     .join("\n");
 }
@@ -143,6 +162,7 @@ export function renderHtmlReport(result: AnalysisResult): string {
       tr.row-removed td { background: var(--before); }
       tr.row-paired td { background: var(--paired); }
       tr.row-context td { background: var(--context); }
+      .code-table td.provenance { background: var(--card); }
       code { white-space: pre; word-break: normal; font-family: "Consolas", "Courier New", monospace; }
       .unresolved { color: var(--warn); }
       a { color: #0a58ca; text-decoration: none; }
