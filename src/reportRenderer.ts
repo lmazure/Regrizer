@@ -29,23 +29,23 @@ function renderChunk(chunk: ReportChunk, index: number): string {
   const rows = renderChunkRows(chunk);
 
   return `
-    <section class="chunk">
-      <div class="chunk-title">Chunk ${index + 1} · -${chunk.oldStart},${chunk.oldCount} +${chunk.newStart},${chunk.newCount}</div>
+    <details class="chunk" open>
+      <summary class="chunk-title">Chunk ${index + 1} · -${chunk.oldStart},${chunk.oldCount} +${chunk.newStart},${chunk.newCount}</summary>
       <table class="code-table">
         <thead><tr><th class="ln">Line</th><th>Code after commit</th><th>Code before commit</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
         <tbody>${rows || ""}</tbody>
       </table>
-    </section>
+    </details>
   `;
 }
 
 function renderFile(file: ReportCommitFile): string {
   if (file.skippedReason) {
     return `
-      <section class="file">
-        <h5>${escapeHtml(file.filePath)}</h5>
+      <details class="file" open>
+        <summary><h5>${escapeHtml(file.filePath)}</h5></summary>
         <div class="meta unresolved">${escapeHtml(file.skippedReason)}</div>
-      </section>
+      </details>
     `;
   }
 
@@ -54,11 +54,11 @@ function renderFile(file: ReportCommitFile): string {
     .join("\n");
 
   return `
-    <section class="file">
-      <h5>${escapeHtml(file.filePath)}</h5>
+    <details class="file" open>
+      <summary><h5>${escapeHtml(file.filePath)}</h5></summary>
       <div class="meta">Old path: ${escapeHtml(file.oldPath)}</div>
       ${chunks || '<div class="meta">No chunks for this file.</div>'}
-    </section>
+    </details>
   `;
 }
 
@@ -68,11 +68,11 @@ function renderCommit(commit: ReportCommit): string {
     .join("\n");
 
   return `
-    <section class="commit">
-      <h4><a href="${escapeHtml(commit.webUrl)}" target="_blank" rel="noopener">${escapeHtml(commit.shortSha)}</a> - ${escapeHtml(commit.title)}</h4>
+    <details class="commit" open>
+      <summary><h4><a href="${escapeHtml(commit.webUrl)}" target="_blank" rel="noopener">${escapeHtml(commit.shortSha)}</a> - ${escapeHtml(commit.title)}</h4></summary>
       <div class="meta">Committed at ${escapeHtml(commit.committedAt)}</div>
       ${files || '<div class="meta">No files in this commit.</div>'}
-    </section>
+    </details>
   `;
 }
 
@@ -82,11 +82,11 @@ function renderMergeRequest(section: ReportMergeRequest): string {
     .join("\n");
 
   return `
-    <section class="mr">
-      <h3><a href="${escapeHtml(section.mr.webUrl ?? "")}" target="_blank" rel="noopener">!${section.mr.iid}</a> ${escapeHtml(section.mr.title ?? "")}</h3>
+    <details class="mr" open>
+      <summary><h3><a href="${escapeHtml(section.mr.webUrl ?? "")}" target="_blank" rel="noopener">!${section.mr.iid}</a> ${escapeHtml(section.mr.title ?? "")}</h3></summary>
       <div class="meta">Merged at ${escapeHtml(section.mergedAt ?? "unknown")}</div>
       ${commits || '<div class="meta">No commits found for this MR.</div>'}
-    </section>
+    </details>
   `;
 }
 
@@ -123,6 +123,13 @@ export function renderHtmlReport(result: AnalysisResult): string {
       .commit { padding: 12px; margin-top: 10px; }
       .file { padding: 10px; margin-top: 10px; }
       .chunk { padding: 10px; margin-top: 10px; overflow-x: auto; }
+      summary { cursor: pointer; list-style: none; }
+      summary::-webkit-details-marker { display: none; }
+      details > summary h3,
+      details > summary h4,
+      details > summary h5,
+      details > summary .chunk-title { display: inline; margin: 0; }
+      details > summary + * { margin-top: 8px; }
       .chunk-title { font-weight: 600; margin-bottom: 6px; }
       .code-table { width: max-content; min-width: 100%; border-collapse: collapse; margin-bottom: 6px; table-layout: auto; }
       .code-table td, .code-table th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; white-space: nowrap; }
