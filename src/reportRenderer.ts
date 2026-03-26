@@ -109,9 +109,30 @@ function renderMergeRequest(section: ReportMergeRequest): string {
   `;
 }
 
-export function renderHtmlReport(result: AnalysisResult): string {
+function renderIssueSection(result: AnalysisResult, index: number): string {
   const mrSections = result.mergeRequests
     .map((section) => renderMergeRequest(section))
+    .join("\n");
+
+  return `
+    <section class="issue-section">
+      <h2>Issue ${index + 1}</h2>
+      <div class="meta"><span class="label">Issue</span> <a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${result.inputIssue.iid} - ${escapeHtml(result.inputIssue.title)}</a></div>
+      <div class="meta"><span class="label">Project</span> <a href="${escapeHtml(result.project.web_url)}" target="_blank" rel="noopener">${escapeHtml(result.project.path_with_namespace)}</a></div>
+      <div class="meta"><span class="label">Merged MRs analyzed</span> ${result.mergeRequests.length}</div>
+      <div class="meta"><span class="label">Generated at</span> ${escapeHtml(result.generatedAt)}</div>
+      ${mrSections || '<div class="mr"><div class="meta">No related merged MRs found.</div></div>'}
+    </section>
+  `;
+}
+
+export function renderHtmlReport(result: AnalysisResult): string {
+  return renderHtmlReports([result]);
+}
+
+export function renderHtmlReports(results: AnalysisResult[]): string {
+  const issueSections = results
+    .map((result, index) => renderIssueSection(result, index))
     .join("\n");
 
   return `<!doctype html>
@@ -135,6 +156,8 @@ export function renderHtmlReport(result: AnalysisResult): string {
       }
       body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--fg); }
       main { width: 100%; max-width: none; margin: 0; padding: 12px; box-sizing: border-box; }
+      .issue-section { margin-top: 20px; }
+      .issue-section:first-of-type { margin-top: 0; }
       h1, h2, h3, h4, h5 { margin: 0 0 8px 0; }
       .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 8px; }
       .mr, .commit, .file, .chunk { background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
@@ -175,11 +198,7 @@ export function renderHtmlReport(result: AnalysisResult): string {
   <body>
     <main>
       <h1>Issue Code-Origin Report</h1>
-      <div class="meta"><span class="label">Issue</span> <a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${result.inputIssue.iid} - ${escapeHtml(result.inputIssue.title)}</a></div>
-      <div class="meta"><span class="label">Project</span> <a href="${escapeHtml(result.project.web_url)}" target="_blank" rel="noopener">${escapeHtml(result.project.path_with_namespace)}</a></div>
-      <div class="meta"><span class="label">Merged MRs analyzed</span> ${result.mergeRequests.length}</div>
-      <div class="meta"><span class="label">Generated at</span> ${escapeHtml(result.generatedAt)}</div>
-      ${mrSections || '<div class="mr"><div class="meta">No related merged MRs found.</div></div>'}
+      ${issueSections}
     </main>
   </body>
 </html>`;

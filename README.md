@@ -172,6 +172,17 @@ npm run build
 node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html
 ```
 
+You can provide `--issue-url` multiple times to analyze several issues in one run and include all of them in a single output HTML report:
+
+```bash
+node dist/src/cli.js \
+  --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
+  --issue-url "https://gitlab.example.com/group/project/-/issues/456" \
+  --output report.html
+```
+
+The generated `--output` file will contain one section per input issue.
+
 Add `--verbose` to print progress logs in the terminal:
 
 ```bash
@@ -194,5 +205,6 @@ npm test
 
 - Authentication: set a GitLab personal access token in `GITLAB_TOKEN`.
 - Use `--verbose` to print every REST call and progress stage.
+- `--issue-url` can be repeated to process several issues in one execution.
 - Binary/unavailable diffs are included with a skip reason.
 - If blame cannot resolve a previous commit for a line, the report marks it as unresolved.
