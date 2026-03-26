@@ -115,7 +115,7 @@ export function renderHtmlReport(result: AnalysisResult): string {
         --context: #f5f7fb;
       }
       body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--fg); }
-      main { max-width: 1200px; margin: 0 auto; padding: 20px; }
+      main { width: 100%; max-width: none; margin: 0; padding: 12px; box-sizing: border-box; }
       h1, h2, h3, h4, h5 { margin: 0 0 8px 0; }
       .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 8px; }
       .mr, .commit, .file, .chunk { background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
