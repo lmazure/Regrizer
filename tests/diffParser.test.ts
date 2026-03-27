@@ -41,5 +41,35 @@ describe("parseUnifiedDiffHunks", () => {
     expect(hunk.trailingContextNew.map((line) => line.text)).toEqual(["context-after-change", "context-after-change-2"]);
     expect(hunk.beforeLines.map((line) => line.text)).toEqual(["old-line"]);
     expect(hunk.afterLines.map((line) => line.text)).toEqual(["new-line"]);
+    expect(hunk.entries.map((entry) => `${entry.kind}:${entry.text}`)).toEqual([
+      "context:context-before-change",
+      "removed:old-line",
+      "added:new-line",
+      "context:context-after-change",
+      "context:context-after-change-2",
+    ]);
+  });
+
+  it("keeps unchanged lines located between two change groups as context entries", () => {
+    const diff = [
+      "@@ -120,9 +120,15 @@",
+      " result.sprintReqVersionId == srvId",
+      " result.testPlanItemId == testPlanItemId",
+      " result.hasNextTestCase == shouldHaveNextTestCase",
+      "+def srv = em.find(SprintReqVersion.class, srvId)",
+      "+srv.executions.size() == nbExecSrv",
+      " where:",
+      "-srvId | isAdmin | userName | testPlanItemId | shouldHaveNextTestCase",
+      "+srvId | isAdmin | userName | testPlanItemId | shouldHaveNextTestCase | nbExecSrv",
+      " -87L  | true    | \"admin\"  | -1226L         | false",
+    ].join("\n");
+
+    const hunks = parseUnifiedDiffHunks(diff);
+    expect(hunks).toHaveLength(1);
+
+    const [hunk] = hunks;
+    const whereEntry = hunk.entries.find((entry) => entry.text === "where:");
+    expect(whereEntry?.kind).toBe("context");
+    expect(hunk.entries.map((entry) => `${entry.kind}:${entry.text}`)).toContain("context:where:");
   });
 });

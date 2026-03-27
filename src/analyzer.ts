@@ -1,4 +1,4 @@
-import { parseUnifiedDiffHunks } from "./diffParser.js";
+import { ParsedHunkEntry, parseUnifiedDiffHunks } from "./diffParser.js";
 import { GitLabClient } from "./gitlabClient.js";
 import { Logger } from "./logger.js";
 import {
@@ -164,14 +164,8 @@ export class IssueAnalyzer {
 
     const chunks: ReportChunk[] = [];
     for (const hunk of hunks) {
-      const contextBefore = [
-        ...this.pickContextBefore(postLines, hunk.newStart, 7),
-        ...this.mapNewSideLines(hunk.leadingContextNew, postLines),
-      ];
-      const contextAfter = [
-        ...this.mapNewSideLines(hunk.trailingContextNew, postLines),
-        ...this.pickContextAfter(postLines, hunk.newStart + hunk.newCount - 1, 7),
-      ];
+      const contextBefore = this.pickContextBefore(postLines, hunk.newStart, 7);
+      const contextAfter = this.pickContextAfter(postLines, hunk.newStart + hunk.newCount - 1, 7);
 
       const afterLines: ReportLine[] = hunk.afterLines.map((line) => ({
         lineNumber: line.lineNumber,
@@ -207,7 +201,7 @@ export class IssueAnalyzer {
         });
       }
 
-      const rows = this.buildChunkRows(contextBefore, afterLines, beforeLines, contextAfter);
+      const rows = this.buildChunkRows(contextBefore, hunk.entries, afterLines, beforeLines, contextAfter);
 
       chunks.push({
         oldStart: hunk.oldStart,
@@ -235,15 +229,9 @@ export class IssueAnalyzer {
     return out;
   }
 
-  private mapNewSideLines(lines: Array<{ lineNumber: number | null; text: string }>, postLines: string[] | null): ReportLine[] {
-    return lines.map((line) => ({
-      lineNumber: line.lineNumber,
-      text: line.lineNumber && postLines ? (postLines[line.lineNumber - 1] ?? line.text) : line.text,
-    }));
-  }
-
   private buildChunkRows(
     contextBefore: ReportLine[],
+    entries: ParsedHunkEntry[],
     afterLines: ReportLine[],
     beforeLines: ReportLine[],
     contextAfter: ReportLine[],
@@ -258,46 +246,91 @@ export class IssueAnalyzer {
       });
     }
 
-    const pairCount = Math.min(afterLines.length, beforeLines.length);
-    for (let i = 0; i < pairCount; i += 1) {
-      const after = afterLines[i];
-      const before = beforeLines[i];
-      rows.push({
-        lineNumber: after.lineNumber,
-        afterText: after.text,
-        beforeText: before.text,
-        previousCommitSha: before.previousCommitSha,
-        previousCommitWebUrl: before.previousCommitWebUrl,
-        previousMergeRequest: before.previousMergeRequest,
-        previousMergeRequestIssues: before.previousMergeRequestIssues,
-        unresolvedReason: before.unresolvedReason,
-        rowKind: "paired",
+    let afterIndex = 0;
+    let beforeIndex = 0;
+    let pendingAfter: ReportLine[] = [];
+    let pendingBefore: ReportLine[] = [];
+
+    const flushPendingChanges = (): void => {
+      const pairCount = Math.min(pendingAfter.length, pendingBefore.length);
+      for (let i = 0; i < pairCount; i += 1) {
+        const after = pendingAfter[i];
+        const before = pendingBefore[i];
+        rows.push({
+          lineNumber: after.lineNumber,
+          afterText: after.text,
+          beforeText: before.text,
+          previousCommitSha: before.previousCommitSha,
+          previousCommitWebUrl: before.previousCommitWebUrl,
+          previousMergeRequest: before.previousMergeRequest,
+          previousMergeRequestIssues: before.previousMergeRequestIssues,
+          unresolvedReason: before.unresolvedReason,
+          rowKind: "paired",
+        });
+      }
+
+      for (let i = pairCount; i < pendingAfter.length; i += 1) {
+        const after = pendingAfter[i];
+        rows.push({
+          lineNumber: after.lineNumber,
+          afterText: after.text,
+          rowKind: "added",
+        });
+      }
+
+      for (let i = pairCount; i < pendingBefore.length; i += 1) {
+        const before = pendingBefore[i];
+        rows.push({
+          lineNumber: null,
+          afterText: "",
+          beforeText: before.text,
+          previousCommitSha: before.previousCommitSha,
+          previousCommitWebUrl: before.previousCommitWebUrl,
+          previousMergeRequest: before.previousMergeRequest,
+          previousMergeRequestIssues: before.previousMergeRequestIssues,
+          unresolvedReason: before.unresolvedReason,
+          rowKind: "removed",
+        });
+      }
+
+      pendingAfter = [];
+      pendingBefore = [];
+    };
+
+    for (const entry of entries) {
+      if (entry.kind === "context") {
+        flushPendingChanges();
+        rows.push({
+          lineNumber: entry.newLineNumber,
+          afterText: entry.text,
+          rowKind: "context",
+        });
+        continue;
+      }
+
+      if (entry.kind === "added") {
+        pendingAfter.push(afterLines[afterIndex] ?? {
+          lineNumber: entry.newLineNumber,
+          text: entry.text,
+        });
+        afterIndex += 1;
+        continue;
+      }
+
+      pendingBefore.push(beforeLines[beforeIndex] ?? {
+        lineNumber: entry.oldLineNumber,
+        text: entry.text,
       });
+      beforeIndex += 1;
     }
 
-    for (let i = pairCount; i < afterLines.length; i += 1) {
-      const after = afterLines[i];
-      rows.push({
-        lineNumber: after.lineNumber,
-        afterText: after.text,
-        rowKind: "added",
-      });
+    if (afterIndex < afterLines.length) {
+      pendingAfter = [...pendingAfter, ...afterLines.slice(afterIndex)];
     }
-
-    for (let i = pairCount; i < beforeLines.length; i += 1) {
-      const before = beforeLines[i];
-      rows.push({
-        lineNumber: null,
-        afterText: "",
-        beforeText: before.text,
-        previousCommitSha: before.previousCommitSha,
-        previousCommitWebUrl: before.previousCommitWebUrl,
-        previousMergeRequest: before.previousMergeRequest,
-        previousMergeRequestIssues: before.previousMergeRequestIssues,
-        unresolvedReason: before.unresolvedReason,
-        rowKind: "removed",
-      });
+    if (beforeIndex < beforeLines.length) {
+      pendingBefore = [...pendingBefore, ...beforeLines.slice(beforeIndex)];
     }
+    flushPendingChanges();
 
     for (const line of contextAfter) {
       rows.push({

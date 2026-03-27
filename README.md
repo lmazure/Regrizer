@@ -105,6 +105,7 @@ Local parsing with unified hunk headers, producing:
 - new range (`newStart`, `newCount`)
 - old-side removed lines (`-`) and new-side added lines (`+`)
 - leading/trailing unchanged hunk context lines (space-prefixed in unified diff)
+- ordered hunk entries so unchanged lines between change groups are preserved as context
 
 ### 9) Fetch file contents for context windows
 
@@ -147,6 +148,8 @@ Rows with old-side (`-`) lines include:
 No API call in this step.
 
 The renderer outputs nested `details/summary` sections for issue -> MR -> commit -> file -> chunk (all `open` by default), with one color-coded unified table per chunk (`context`, `paired`, `added`, `removed` rows).
+
+Within a single hunk, unchanged lines in the middle of changes (for example a `where:` line between two modified groups) are rendered as `context` rows, not as modified rows.
 
 Each issue section title is rendered from issue data (for example, `Issue #6380 - <issue title>`) instead of generic numbering.
 

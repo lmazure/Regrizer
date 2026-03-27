@@ -5,11 +5,19 @@ export interface ParsedDiffLine {
   text: string;
 }
 
+export interface ParsedHunkEntry {
+  kind: "context" | "added" | "removed";
+  oldLineNumber: number | null;
+  newLineNumber: number | null;
+  text: string;
+}
+
 export interface ParsedDiffHunk {
   oldStart: number;
   oldCount: number;
   newStart: number;
   newCount: number;
+  entries: ParsedHunkEntry[];
   leadingContextNew: ParsedDiffLine[];
   trailingContextNew: ParsedDiffLine[];
   beforeLines: ParsedDiffLine[];
@@ -86,6 +94,7 @@ export function parseUnifiedDiffHunks(diff: string): ParsedDiffHunk[] {
         oldCount: Number(header[2] ?? "1"),
         newStart: newLine,
         newCount: Number(header[4] ?? "1"),
+        entries: [],
         leadingContextNew: [],
         trailingContextNew: [],
         beforeLines: [],
@@ -103,6 +112,12 @@ export function parseUnifiedDiffHunks(diff: string): ParsedDiffHunk[] {
     if (line.startsWith("+")) {
       seenModification = true;
       trailingContextCandidate = [];
+      current.entries.push({
+        kind: "added",
+        oldLineNumber: null,
+        newLineNumber: newLine,
+        text: line.slice(1),
+      });
       current.afterLines.push({ lineNumber: newLine, text: line.slice(1) });
       newLine += 1;
       continue;
@@ -111,6 +126,12 @@ export function parseUnifiedDiffHunks(diff: string): ParsedDiffHunk[] {
     if (line.startsWith("-")) {
       seenModification = true;
       trailingContextCandidate = [];
+      current.entries.push({
+        kind: "removed",
+        oldLineNumber: oldLine,
+        newLineNumber: null,
+        text: line.slice(1),
+      });
       current.beforeLines.push({ lineNumber: oldLine, text: line.slice(1) });
       oldLine += 1;
       continue;
@@ -121,6 +142,12 @@ export function parseUnifiedDiffHunks(diff: string): ParsedDiffHunk[] {
       lineNumber: newLine,
       text: contextText,
     };
+    current.entries.push({
+      kind: "context",
+      oldLineNumber: oldLine,
+      newLineNumber: newLine,
+      text: contextText,
+    });
     if (!seenModification) {
       current.leadingContextNew.push(contextLine);
     } else {
