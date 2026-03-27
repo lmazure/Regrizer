@@ -8,7 +8,7 @@ import { parseGitLabIssueUrl } from "./utils.js";
 interface CliArgs {
   issueUrls: string[];
   output: string;
-  verbose: boolean;
+  verboseLevel: number;
 }
 
 interface FailedIssueAnalysis {
@@ -19,7 +19,7 @@ interface FailedIssueAnalysis {
 function parseArgs(argv: string[]): CliArgs {
   const args = new Map<string, string>();
   const issueUrls: string[] = [];
-  let verbose = false;
+  let verboseLevel = 0;
 
   for (let index = 2; index < argv.length; index += 1) {
     const value = argv[index];
@@ -29,7 +29,7 @@ function parseArgs(argv: string[]): CliArgs {
     }
 
     if (value === "--verbose") {
-      verbose = true;
+      verboseLevel += 1;
       continue;
     }
 
@@ -54,18 +54,18 @@ function parseArgs(argv: string[]): CliArgs {
   return {
     issueUrls,
     output: args.get("output") ?? "report.html",
-    verbose,
+    verboseLevel,
   };
 }
 
 async function run(): Promise<void> {
-  const { issueUrls, output, verbose } = parseArgs(process.argv);
+  const { issueUrls, output, verboseLevel } = parseArgs(process.argv);
   const token = process.env.GITLAB_TOKEN;
   if (!token) {
     throw new Error("GITLAB_TOKEN environment variable is required");
   }
 
-  const logger = new Logger(verbose);
+  const logger = new Logger(verboseLevel);
   logger.log(`Starting analysis for ${issueUrls.length} issue(s)`);
   const results = [];
   const failedIssues: FailedIssueAnalysis[] = [];
@@ -99,6 +99,6 @@ async function run(): Promise<void> {
 
 run().catch((error) => {
   process.stderr.write(`Error: ${(error as Error).message}\n`);
-  process.stderr.write("Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--output report.html] [--verbose]\n");
+  process.stderr.write("Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--output report.html] [--verbose] [--verbose]\n");
   process.exitCode = 1;
 });

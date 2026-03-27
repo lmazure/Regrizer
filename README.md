@@ -199,6 +199,12 @@ Add `--verbose` to print progress logs in the terminal:
 node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html --verbose
 ```
 
+Repeat the flag (`--verbose --verbose`) to also print payload-only REST and GraphQL request/response logs:
+
+```bash
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html --verbose --verbose
+```
+
 Or run directly in dev mode:
 
 ```bash
@@ -214,7 +220,8 @@ npm test
 ## Notes
 
 - Authentication: set a GitLab personal access token in `GITLAB_TOKEN`.
-- Use `--verbose` to print every REST call and progress stage.
+- Use `--verbose` to print progress and REST/GraphQL call summaries.
+- Use `--verbose --verbose` to print payload-only REST and GraphQL request/response logs.
 - `--issue-url` can be repeated to process several issues in one execution.
 - Binary/unavailable diffs are included with a skip reason.
 - If blame cannot resolve a previous commit for a line, the report marks it as unresolved.

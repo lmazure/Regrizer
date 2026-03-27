@@ -356,6 +356,7 @@ export class GitLabClient {
   private async requestJson<T>(path: string, params?: Record<string, string | number | boolean>): Promise<T> {
     const query = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}` : "";
     this.logger.log(`REST ${path}${query}`);
+    this.logger.logPayload(`REST request payload ${path}`, params ?? null);
     const response = await fetch(`${this.apiBaseUrl}${path}${query}`, { headers: this.headers });
 
     if (!response.ok) {
@@ -363,11 +364,14 @@ export class GitLabClient {
       throw new Error(`GitLab API request failed (${response.status} ${response.statusText}): ${path} ${body}`);
     }
 
-    return response.json() as Promise<T>;
+    const payload = (await response.json()) as T;
+    this.logger.logPayload(`REST response payload ${path}`, payload);
+    return payload;
   }
 
   private async graphQlRequest<T>(query: string, variables: Record<string, unknown>): Promise<T> {
     this.logger.log("GraphQL request");
+    this.logger.logPayload("GraphQL request payload", { query, variables });
     const response = await fetch(this.graphQlUrl, {
       method: "POST",
       headers: {
@@ -382,6 +386,7 @@ export class GitLabClient {
     }
 
     const payload = (await response.json()) as GraphQlResponse<T>;
+    this.logger.logPayload("GraphQL response payload", payload);
     if (payload.errors && payload.errors.length > 0) {
       throw new Error(`GitLab GraphQL error: ${payload.errors.map((error) => error.message).join("; ")}`);
     }
