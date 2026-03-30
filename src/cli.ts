@@ -3,7 +3,7 @@ import { IssueAnalyzer } from "./analyzer.js";
 import { GitLabClient } from "./gitlabClient.js";
 import { Logger } from "./logger.js";
 import { renderHtmlReports } from "./reportRenderer.js";
-import { parseGitLabIssueUrl } from "./utils.js";
+import { loadIssueUrlsFromFile, parseGitLabIssueUrl } from "./utils.js";
 
 interface CliArgs {
   issueUrls: string[];
@@ -19,6 +19,7 @@ interface FailedIssueAnalysis {
 function parseArgs(argv: string[]): CliArgs {
   const args = new Map<string, string>();
   const issueUrls: string[] = [];
+  const issueUrlFiles: string[] = [];
   let verboseLevel = 0;
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -41,14 +42,20 @@ function parseArgs(argv: string[]): CliArgs {
 
     if (key === "issue-url") {
       issueUrls.push(next);
+    } else if (key === "issue-url-file") {
+      issueUrlFiles.push(next);
     } else {
       args.set(key, next);
     }
     index += 1;
   }
 
+  for (const issueUrlFile of issueUrlFiles) {
+    issueUrls.push(...loadIssueUrlsFromFile(issueUrlFile));
+  }
+
   if (issueUrls.length === 0) {
-    throw new Error("Missing required argument --issue-url (can be provided multiple times)");
+    throw new Error("Missing required issue URL input (provide --issue-url and/or --issue-url-file)");
   }
 
   return {
@@ -99,6 +106,8 @@ async function run(): Promise<void> {
 
 run().catch((error) => {
   process.stderr.write(`Error: ${(error as Error).message}\n`);
-  process.stderr.write("Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--output report.html] [--verbose] [--verbose]\n");
+  process.stderr.write(
+    "Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--issue-url-file <file> ...] [--output report.html] [--verbose] [--verbose]\n",
+  );
   process.exitCode = 1;
 });

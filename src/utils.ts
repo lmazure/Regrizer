@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { ParsedIssueUrl } from "./types.js";
 
 export function parseGitLabIssueUrl(issueUrl: string): ParsedIssueUrl {
@@ -7,7 +8,6 @@ export function parseGitLabIssueUrl(issueUrl: string): ParsedIssueUrl {
   } catch {
     throw new Error(`Invalid issue URL: ${issueUrl}`);
   }
-
   const match = parsed.pathname.match(/^(?<projectPath>.+)\/-\/(issues|work_items)\/(?<iid>\d+)\/?$/);
   if (!match?.groups?.projectPath || !match.groups.iid) {
     throw new Error(
@@ -20,6 +20,23 @@ export function parseGitLabIssueUrl(issueUrl: string): ParsedIssueUrl {
     projectPath: decodeURIComponent(match.groups.projectPath.replace(/^\//, "")),
     issueIid: Number(match.groups.iid),
   };
+}
+
+export function parseIssueUrlsFromFileContent(content: string): string[] {
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+export function loadIssueUrlsFromFile(filePath: string): string[] {
+  try {
+    const content = readFileSync(filePath, "utf-8");
+    return parseIssueUrlsFromFileContent(content);
+  } catch (error) {
+    const reason = (error as Error).message;
+    throw new Error(`Failed to read issue URL file ${filePath}: ${reason}`);
+  }
 }
 
 export function uniqueNumbers(values: number[]): number[] {

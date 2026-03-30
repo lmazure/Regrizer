@@ -186,6 +186,22 @@ node dist/src/cli.js \
   --output report.html
 ```
 
+You can also provide issue URLs from a file with `--issue-url-file` (one issue URL per line; blank lines are ignored):
+
+```bash
+node dist/src/cli.js --issue-url-file ./issues.txt --output report.html
+```
+
+You can combine repeated `--issue-url`, positional URLs, and one or more `--issue-url-file` flags:
+
+```bash
+node dist/src/cli.js \
+  --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
+  --issue-url-file ./issues-team-a.txt \
+  --issue-url-file ./issues-team-b.txt \
+  --output report.html
+```
+
 Additional issue URLs can also be passed positionally after the first `--issue-url` value:
 
 ```bash
@@ -226,5 +242,6 @@ npm test
 - Use `--verbose` to print progress and REST/GraphQL call summaries.
 - Use `--verbose --verbose` to print payload-only REST and GraphQL request/response logs.
 - `--issue-url` can be repeated to process several issues in one execution.
+- `--issue-url-file <file>` loads issue URLs from a file (one URL per non-empty line).
 - Binary/unavailable diffs are included with a skip reason.
 - If blame cannot resolve a previous commit for a line, the report marks it as unresolved.

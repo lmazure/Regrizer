@@ -1,5 +1,13 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { chunkSortedNumbers, parseGitLabIssueUrl } from "../src/utils.js";
+import {
+  chunkSortedNumbers,
+  loadIssueUrlsFromFile,
+  parseGitLabIssueUrl,
+  parseIssueUrlsFromFileContent,
+} from "../src/utils.js";
 
 describe("parseGitLabIssueUrl", () => {
   it("parses a valid issue URL", () => {
@@ -21,6 +29,40 @@ describe("parseGitLabIssueUrl", () => {
   it("throws for invalid format", () => {
     expect(() => parseGitLabIssueUrl("https://gitlab.example.com/group/project/issues/1")).toThrow(
       "Issue URL must match",
+    );
+  });
+});
+
+describe("issue URL file helpers", () => {
+  it("parses one URL per line and ignores blank lines", () => {
+    const parsed = parseIssueUrlsFromFileContent(
+      "  https://gitlab.example.com/group/project/-/issues/1  \n\nhttps://gitlab.example.com/group/project/-/issues/2\n",
+    );
+
+    expect(parsed).toEqual([
+      "https://gitlab.example.com/group/project/-/issues/1",
+      "https://gitlab.example.com/group/project/-/issues/2",
+    ]);
+  });
+
+  it("loads issue URLs from file", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "regrizer-"));
+    const filePath = join(tempDir, "issues.txt");
+    writeFileSync(
+      filePath,
+      "https://gitlab.example.com/group/project/-/issues/10\nhttps://gitlab.example.com/group/project/-/issues/11\n",
+      "utf-8",
+    );
+
+    expect(loadIssueUrlsFromFile(filePath)).toEqual([
+      "https://gitlab.example.com/group/project/-/issues/10",
+      "https://gitlab.example.com/group/project/-/issues/11",
+    ]);
+  });
+
+  it("throws a readable error when file cannot be read", () => {
+    expect(() => loadIssueUrlsFromFile("this-file-does-not-exist.txt")).toThrow(
+      "Failed to read issue URL file this-file-does-not-exist.txt",
     );
   });
 });
