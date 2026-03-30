@@ -7,9 +7,11 @@ The report hierarchy is:
 1. Merge requests (latest merged first)
 2. Commit selected as the merge result on target branch
 3. Files touched by that commit
-4. Diff chunks per file
-5. For each chunk:
-   - a single table with columns:
+4. For each file:
+   - a single table containing all modified chunks for that file
+   - each gap between two non-overlapping chunk groups is rendered as a separator row with `…` in every column
+   - overlapping/adjacent chunks in the same file are merged before rendering
+5. Table columns:
      - line number (as in file after commit)
      - code after commit
      - code before commit
@@ -19,7 +21,7 @@ The report hierarchy is:
    - previous commit / merge request / related issues cells are vertically merged when consecutive rows have the same value
    - unchanged rows fill only line number + code-after columns
    - changed rows fill before/provenance columns when applicable
-6. Every hierarchy level (MR, commit, file, chunk) is collapsible and expanded by default when the report opens
+6. Every hierarchy level (MR, commit, file) is collapsible and expanded by default when the report opens
 
 ## Architecture
 
@@ -116,7 +118,7 @@ For each changed file:
 - Pre-image (before commit), when parent exists:
   - **REST** [`GET /projects/:project_id/repository/files/:url_encoded_old_path/raw?ref=:first_parent_sha`](https://docs.gitlab.com/api/repository_files/#retrieve-a-raw-file-from-a-repository)
 
-Used to render 7 lines before/after plus exact chunk lines in a single table per chunk. Unchanged rows only populate the first two columns; changed rows also carry before/provenance metadata.
+Used to render 7 lines before/after plus exact chunk lines in a single table per file. Unchanged rows only populate the first two columns; changed rows also carry before/provenance metadata.
 
 ### 10) Attribute previous commit per old-side line
 
@@ -147,13 +149,15 @@ Rows with old-side (`-`) lines include:
 
 No API call in this step.
 
-The renderer outputs nested `details/summary` sections for issue -> MR -> commit -> file -> chunk (all `open` by default), with one color-coded unified table per chunk (`context`, `paired`, `added`, `removed` rows).
+The renderer outputs nested `details/summary` sections for issue -> MR -> commit -> file (all `open` by default), with one color-coded unified table per file (`context`, `paired`, `added`, `removed` rows).
+
+Within a file table, non-overlapping chunk groups are separated by a row containing `…` in every column. Overlapping/adjacent groups are merged into a single contiguous section.
 
 Within a single hunk, unchanged lines in the middle of changes (for example a `where:` line between two modified groups) are rendered as `context` rows, not as modified rows.
 
 Each issue section title is rendered from issue data (for example, `Issue #6380 - <issue title>`) instead of generic numbering.
 
-For readability, repeated consecutive values in these provenance columns are rendered as merged cells (`rowspan`) within each chunk table:
+For readability, repeated consecutive values in these provenance columns are rendered as merged cells (`rowspan`) within each file table:
 
 - previous commit
 - merge request

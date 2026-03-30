@@ -6,41 +6,188 @@ interface FailedIssueRenderItem {
   errorMessage: string;
 }
 
-function renderChunkRows(chunk: ReportChunk): string {
-  const commitValues = chunk.rows.map((row) => row.previousCommitSha
+interface ChunkBlock {
+  filePath: string;
+  startLine: number;
+  endLine: number;
+  rows: ReportChunk["rows"];
+}
+
+type CommitTableRow =
+  | { kind: "data"; row: ReportChunk["rows"][number] }
+  | { kind: "separator" };
+
+function getChunkEffectiveRange(chunk: ReportChunk): { startLine: number; endLine: number } {
+  const lineNumbers = chunk.rows
+    .map((row) => row.lineNumber)
+    .filter((lineNumber): lineNumber is number => typeof lineNumber === "number");
+
+  if (lineNumbers.length > 0) {
+    return {
+      startLine: Math.min(...lineNumbers),
+      endLine: Math.max(...lineNumbers),
+    };
+  }
+
+  const startLine = chunk.newStart;
+  const endLine = chunk.newCount > 0 ? chunk.newStart + chunk.newCount - 1 : chunk.newStart;
+  return { startLine, endLine };
+}
+
+function rowSignature(row: ReportChunk["rows"][number]): string {
+  return JSON.stringify([
+    row.rowKind,
+    row.lineNumber,
+    row.afterText,
+    row.beforeText ?? "",
+    row.previousCommitSha ?? "",
+    row.previousCommitWebUrl ?? "",
+    row.previousMergeRequest?.iid ?? "",
+    row.previousMergeRequest?.webUrl ?? "",
+    (row.previousMergeRequestIssues ?? []).map((issue) => `${issue.webUrl}|${issue.title}`),
+    row.unresolvedReason ?? "",
+  ]);
+}
+
+function findBoundaryOverlapLength(leftRows: ReportChunk["rows"], rightRows: ReportChunk["rows"]): number {
+  const maxOverlap = Math.min(leftRows.length, rightRows.length);
+
+  for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
+    let matches = true;
+    for (let index = 0; index < overlap; index += 1) {
+      const leftRow = leftRows[leftRows.length - overlap + index];
+      const rightRow = rightRows[index];
+      if (rowSignature(leftRow) !== rowSignature(rightRow)) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) {
+      return overlap;
+    }
+  }
+
+  return 0;
+}
+
+function mergeOverlappingBlocks(blocks: ChunkBlock[]): ChunkBlock[] {
+  if (blocks.length <= 1) {
+    return blocks;
+  }
+
+  const merged: ChunkBlock[] = [];
+
+  for (const block of blocks) {
+    const previous = merged[merged.length - 1];
+    if (!previous || previous.filePath !== block.filePath || block.startLine > previous.endLine + 1) {
+      merged.push({ ...block, rows: [...block.rows] });
+      continue;
+    }
+
+    const overlapLength = findBoundaryOverlapLength(previous.rows, block.rows);
+    previous.rows = [...previous.rows, ...block.rows.slice(overlapLength)];
+    previous.endLine = Math.max(previous.endLine, block.endLine);
+  }
+
+  return merged;
+}
+
+function buildFileTableRows(file: ReportCommitFile): CommitTableRow[] {
+  const blocks = file.chunks
+    .map((chunk) => {
+      const range = getChunkEffectiveRange(chunk);
+      return {
+        filePath: file.filePath,
+        startLine: range.startLine,
+        endLine: range.endLine,
+        rows: chunk.rows,
+      } satisfies ChunkBlock;
+    })
+    .sort((left, right) => {
+      if (left.startLine !== right.startLine) {
+        return left.startLine - right.startLine;
+      }
+      return left.endLine - right.endLine;
+    });
+
+  const mergedBlocks = mergeOverlappingBlocks(blocks);
+  const rows: CommitTableRow[] = [];
+
+  mergedBlocks.forEach((block, index) => {
+    if (index > 0) {
+      rows.push({ kind: "separator" });
+    }
+    rows.push(...block.rows.map((row) => ({ kind: "data", row } as const)));
+  });
+
+  return rows;
+}
+
+function renderCommitTableRows(rows: CommitTableRow[]): string {
+  const commitValues = rows.map((item) => {
+    if (item.kind === "separator") {
+      return null;
+    }
+
+    const row = item.row;
+    return row.previousCommitSha
     ? (row.previousCommitWebUrl
       ? `<a href="${escapeHtml(row.previousCommitWebUrl)}" target="_blank" rel="noopener"><code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code></a>`
       : `<code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code>`)
-    : (row.unresolvedReason ? `<span class="unresolved">${escapeHtml(row.unresolvedReason)}</span>` : ""));
+    : (row.unresolvedReason ? `<span class="unresolved">${escapeHtml(row.unresolvedReason)}</span>` : "");
+  });
 
-  const mrValues = chunk.rows.map((row) => row.previousMergeRequest
+  const mrValues = rows.map((item) => {
+    if (item.kind === "separator") {
+      return null;
+    }
+
+    const row = item.row;
+    return row.previousMergeRequest
     ? `<a href="${escapeHtml(row.previousMergeRequest.webUrl ?? "")}" target="_blank" rel="noopener">!${row.previousMergeRequest.iid}</a>`
-    : "");
+    : "";
+  });
 
-  const issuesValues = chunk.rows.map((row) => (row.previousMergeRequestIssues && row.previousMergeRequestIssues.length > 0)
+  const issuesValues = rows.map((item) => {
+    if (item.kind === "separator") {
+      return null;
+    }
+
+    const row = item.row;
+    return (row.previousMergeRequestIssues && row.previousMergeRequestIssues.length > 0)
     ? row.previousMergeRequestIssues
       .map((issue) => `<a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a>`)
       .join("<br />")
-    : "");
+    : "";
+  });
 
-  const getRowSpan = (values: string[], startIndex: number): number => {
+  const getRowSpan = (values: Array<string | null>, startIndex: number): number => {
     const current = values[startIndex];
+    if (current === null) {
+      return 1;
+    }
+
     let span = 1;
-    while (startIndex + span < values.length && values[startIndex + span] === current) {
+    while (startIndex + span < values.length && values[startIndex + span] !== null && values[startIndex + span] === current) {
       span += 1;
     }
     return span;
   };
 
-  return chunk.rows
-    .map((row, index) => {
-      const commitCell = index === 0 || commitValues[index] !== commitValues[index - 1]
+  return rows
+    .map((item, index) => {
+      if (item.kind === "separator") {
+        return "<tr class=\"row-separator\"><td class=\"ln\">…</td><td>…</td><td>…</td><td class=\"provenance provenance-commit\">…</td><td class=\"provenance provenance-mr\">…</td><td class=\"provenance provenance-issues\">…</td></tr>";
+      }
+
+      const row = item.row;
+      const commitCell = index === 0 || commitValues[index] === null || commitValues[index] !== commitValues[index - 1]
         ? `<td class="provenance provenance-commit" rowspan="${getRowSpan(commitValues, index)}">${commitValues[index]}</td>`
         : "";
-      const mrCell = index === 0 || mrValues[index] !== mrValues[index - 1]
+      const mrCell = index === 0 || mrValues[index] === null || mrValues[index] !== mrValues[index - 1]
         ? `<td class="provenance provenance-mr" rowspan="${getRowSpan(mrValues, index)}">${mrValues[index]}</td>`
         : "";
-      const issuesCell = index === 0 || issuesValues[index] !== issuesValues[index - 1]
+      const issuesCell = index === 0 || issuesValues[index] === null || issuesValues[index] !== issuesValues[index - 1]
         ? `<td class="provenance provenance-issues" rowspan="${getRowSpan(issuesValues, index)}">${issuesValues[index]}</td>`
         : "";
 
@@ -49,17 +196,14 @@ function renderChunkRows(chunk: ReportChunk): string {
     .join("\n");
 }
 
-function renderChunk(chunk: ReportChunk, index: number): string {
-  const rows = renderChunkRows(chunk);
+function renderFileTable(file: ReportCommitFile): string {
+  const rows = renderCommitTableRows(buildFileTableRows(file));
 
   return `
-    <details class="chunk" open>
-      <summary class="chunk-title">Chunk ${index + 1} · -${chunk.oldStart},${chunk.oldCount} +${chunk.newStart},${chunk.newCount}</summary>
-      <table class="code-table">
-        <thead><tr><th class="ln">Line</th><th>Code after commit</th><th>Code before commit</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
-        <tbody>${rows || ""}</tbody>
-      </table>
-    </details>
+    <table class="code-table">
+      <thead><tr><th class="ln">Line</th><th>Code after commit</th><th>Code before commit</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
+      <tbody>${rows || ""}</tbody>
+    </table>
   `;
 }
 
@@ -83,15 +227,13 @@ function renderFile(file: ReportCommitFile): string {
     `;
   }
 
-  const chunks = file.chunks
-    .map((chunk, index) => renderChunk(chunk, index))
-    .join("\n");
+  const table = renderFileTable(file);
 
   return `
     <details class="file" open>
       <summary><h5>${escapeHtml(file.filePath)}</h5></summary>
       <div class="meta">Old path: ${escapeHtml(file.oldPath)}</div>
-      ${chunks || '<div class="meta">No chunks for this file.</div>'}
+      ${table}
     </details>
   `;
 }
@@ -184,11 +326,10 @@ export function renderHtmlReports(results: AnalysisResult[], failedIssues: Faile
       .issue > summary { font-weight: 600; }
       h1, h2, h3, h4, h5 { margin: 0 0 8px 0; }
       .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 8px; }
-      .mr, .commit, .file, .chunk { background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+      .mr, .commit, .file { background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
       .mr { padding: 14px; margin-top: 16px; }
       .commit { padding: 12px; margin-top: 10px; }
-      .file { padding: 10px; margin-top: 10px; }
-      .chunk { padding: 10px; margin-top: 10px; overflow-x: auto; }
+      .file { padding: 10px; margin-top: 10px; overflow-x: auto; }
       summary { cursor: pointer; list-style: none; }
       summary::-webkit-details-marker { display: none; }
       details > summary h3,
@@ -196,7 +337,6 @@ export function renderHtmlReports(results: AnalysisResult[], failedIssues: Faile
       details > summary h5,
       details > summary .chunk-title { display: inline; margin: 0; }
       details > summary + * { margin-top: 8px; }
-      .chunk-title { font-weight: 600; margin-bottom: 6px; }
       .code-table { width: max-content; min-width: 100%; border-collapse: collapse; margin-bottom: 6px; table-layout: auto; }
       .code-table td, .code-table th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; white-space: nowrap; }
       .ln { width: 70px; color: var(--muted); text-align: right; }
@@ -209,6 +349,7 @@ export function renderHtmlReports(results: AnalysisResult[], failedIssues: Faile
       tr.row-removed td { background: var(--before); }
       tr.row-paired td { background: var(--paired); }
       tr.row-context td { background: var(--context); }
+      tr.row-separator td { background: #eef2f7; text-align: center; font-weight: 600; color: var(--muted); }
       .code-table td.provenance { background: var(--card); }
       code { white-space: pre; word-break: normal; font-family: "Consolas", "Courier New", monospace; }
       .unresolved { color: var(--warn); }
