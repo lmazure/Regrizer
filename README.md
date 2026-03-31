@@ -11,6 +11,8 @@ The report hierarchy is:
    - a single table containing all modified chunks for that file
    - each gap between two non-overlapping chunk groups is rendered as a separator row with `…` in every column
    - overlapping/adjacent chunks in the same file are merged before rendering
+   - if rendered rows do not include line 1, a leading `…` row is inserted
+   - if rendered rows do not include the file's last line, a trailing `…` row is inserted
 5. Table columns:
      - line number (as in file after commit)
      - code after commit
@@ -152,6 +154,8 @@ No API call in this step.
 The renderer outputs nested `details/summary` sections for issue -> MR -> commit -> file (all `open` by default), with one color-coded unified table per file (`context`, `paired`, `added`, `removed` rows).
 
 Within a file table, non-overlapping chunk groups are separated by a row containing `…` in every column. Overlapping/adjacent groups are merged into a single contiguous section.
+
+When Regrizer can determine post-image file length, it also adds boundary separators: one at the top if the first visible numbered row is not line 1, and one at the bottom if the last visible numbered row is not the file's last line.
 
 Within a single hunk, unchanged lines in the middle of changes (for example a `where:` line between two modified groups) are rendered as `context` rows, not as modified rows.
 

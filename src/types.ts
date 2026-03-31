@@ -125,6 +125,7 @@ export interface ReportCommitFile {
   filePath: string;
   oldPath: string;
   chunks: ReportChunk[];
+  fileLineCount?: number | null;
   skippedReason?: string;
 }
 

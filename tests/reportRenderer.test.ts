@@ -178,4 +178,38 @@ describe("renderHtmlReport", () => {
     expect((html.match(/<code>tail-line<\/code>/g) ?? []).length).toBe(1);
     expect((html.match(/<table class=\"code-table\">/g) ?? []).length).toBe(1);
   });
+
+  it("adds ellipsis rows at beginning and end when file boundaries are outside rendered rows", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileLineCount: 100,
+        chunks: [
+          {
+            oldStart: 40,
+            oldCount: 1,
+            newStart: 40,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 40,
+                afterText: "middle-line",
+                beforeText: "middle-line-old",
+                previousCommitSha: "ffffffffffff6666666666666666666666666666",
+                previousCommitWebUrl: "https://gitlab.example.com/group/project/-/commit/ffffffffffff6666666666666666666666666666",
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+
+    expect((html.match(/<tr class="row-separator">/g) ?? []).length).toBe(2);
+    expect(html).toMatch(/<tbody>\s*<tr class="row-separator">/);
+    expect(html).toMatch(/<tr class="row-separator">[\s\S]*<\/tr>\s*<\/tbody>/);
+  });
 });

@@ -120,6 +120,20 @@ function buildFileTableRows(file: ReportCommitFile): CommitTableRow[] {
     rows.push(...block.rows.map((row) => ({ kind: "data", row } as const)));
   });
 
+  const firstVisibleLine = rows.find((item): item is { kind: "data"; row: ReportChunk["rows"][number] } => (
+    item.kind === "data" && item.row.lineNumber !== null
+  ));
+  if (file.fileLineCount && firstVisibleLine && firstVisibleLine.row.lineNumber !== 1) {
+    rows.unshift({ kind: "separator" });
+  }
+
+  const lastVisibleLine = [...rows].reverse().find((item): item is { kind: "data"; row: ReportChunk["rows"][number] } => (
+    item.kind === "data" && item.row.lineNumber !== null
+  ));
+  if (file.fileLineCount && lastVisibleLine && lastVisibleLine.row.lineNumber !== file.fileLineCount) {
+    rows.push({ kind: "separator" });
+  }
+
   return rows;
 }
 

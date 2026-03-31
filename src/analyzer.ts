@@ -159,6 +159,7 @@ export class IssueAnalyzer {
     }
 
     const postLines = await this.safeReadFileLines(projectId, filePath, commit.id);
+    const fileLineCount = postLines ? postLines.length : null;
     const parentRef = (commit.parent_ids && commit.parent_ids.length > 0) ? commit.parent_ids[0] : null;
     const preLines = parentRef ? await this.safeReadFileLines(projectId, oldPath, parentRef) : null;
 
@@ -212,7 +213,7 @@ export class IssueAnalyzer {
       });
     }
 
-    return { filePath, oldPath, chunks };
+    return { filePath, oldPath, chunks, fileLineCount };
   }
 
   private pickContextBefore(lines: string[] | null, startLine: number, radius: number): ReportLine[] {
