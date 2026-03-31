@@ -44,6 +44,8 @@ export interface GitLabCommitDetail {
   message: string;
   authored_date: string;
   committed_date: string;
+  committer_name?: string;
+  committer_email?: string;
   parent_ids: string[];
   web_url: string;
 }
@@ -135,6 +137,8 @@ export interface ReportCommit {
   title: string;
   message: string;
   committedAt: string;
+  committerName?: string | null;
+  committerEmail?: string | null;
   webUrl: string;
   parentIds: string[];
   files: ReportCommitFile[];

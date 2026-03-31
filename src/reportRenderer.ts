@@ -256,11 +256,15 @@ function renderCommit(commit: ReportCommit): string {
   const files = commit.files
     .map((file) => renderFile(file))
     .join("\n");
+  const committerText = commit.committerName && commit.committerEmail
+    ? `${commit.committerName} <${commit.committerEmail}>`
+    : (commit.committerName ?? commit.committerEmail ?? "unknown");
 
   return `
     <details class="commit" open>
       <summary><h4><a href="${escapeHtml(commit.webUrl)}" target="_blank" rel="noopener">${escapeHtml(commit.shortSha)}</a> - ${escapeHtml(commit.title)}</h4></summary>
       <div class="meta">Committed at ${escapeHtml(commit.committedAt)}</div>
+      <div class="meta">Committer ${escapeHtml(committerText)}</div>
       ${files || '<div class="meta">No files in this commit.</div>'}
     </details>
   `;

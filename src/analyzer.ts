@@ -112,6 +112,8 @@ export class IssueAnalyzer {
       title: detail.title,
       message: detail.message,
       committedAt: detail.committed_date,
+      committerName: detail.committer_name ?? null,
+      committerEmail: detail.committer_email ?? null,
       webUrl: detail.web_url,
       parentIds: detail.parent_ids ?? [],
       files,

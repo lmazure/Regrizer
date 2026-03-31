@@ -9,6 +9,8 @@ function buildResult(files: ReportCommitFile[]): AnalysisResult {
     title: "Test commit",
     message: "Test commit message",
     committedAt: "2026-03-30T00:00:00.000Z",
+    committerName: "Ada Lovelace",
+    committerEmail: "ada@example.com",
     webUrl: "https://gitlab.example.com/group/project/-/commit/1234567890abcdef",
     parentIds: ["parent-sha"],
     files,
@@ -112,6 +114,7 @@ describe("renderHtmlReport", () => {
     expect((html.match(/<table class="code-table">/g) ?? []).length).toBe(2);
     expect((html.match(/<tr class="row-separator">/g) ?? []).length).toBe(1);
     expect((html.match(/>…</g) ?? []).length).toBeGreaterThanOrEqual(6);
+    expect(html).toContain("Committer Ada Lovelace &lt;ada@example.com&gt;");
   });
 
   it("merges overlapping chunks in the same file and does not render separator between them", () => {
