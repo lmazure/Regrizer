@@ -24,6 +24,14 @@ export interface GitLabMergeRequestRef {
   iid: number;
   title?: string;
   webUrl?: string;
+  authorName?: string;
+  assignees?: string[];
+  reviewers?: string[];
+}
+
+export interface GitLabUserRef {
+  name?: string;
+  username?: string;
 }
 
 export interface GitLabCommitRef {
@@ -64,6 +72,9 @@ export interface GitLabMergeRequest {
   target_branch: string;
   source_branch: string;
   description: string | null;
+  author?: GitLabUserRef | null;
+  assignees?: GitLabUserRef[];
+  reviewers?: GitLabUserRef[];
 }
 
 export interface GitLabMrChange {

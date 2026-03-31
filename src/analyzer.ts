@@ -50,6 +50,9 @@ export class IssueAnalyzer {
           iid: mr.iid,
           title: mr.title,
           webUrl: mr.web_url,
+          authorName: this.toDisplayName(mr.author),
+          assignees: (mr.assignees ?? []).map((user) => this.toDisplayName(user)),
+          reviewers: (mr.reviewers ?? []).map((user) => this.toDisplayName(user)),
         },
         mergedAt: mr.merged_at,
         commits,
@@ -418,5 +421,9 @@ export class IssueAnalyzer {
     } catch {
       return null;
     }
+  }
+
+  private toDisplayName(user: { name?: string; username?: string } | null | undefined): string {
+    return user?.name ?? user?.username ?? "unknown";
   }
 }

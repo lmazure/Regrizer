@@ -274,11 +274,20 @@ function renderMergeRequest(section: ReportMergeRequest): string {
   const commits = section.commits
     .map((commit) => renderCommit(commit))
     .join("\n");
+  const assignees = section.mr.assignees && section.mr.assignees.length > 0
+    ? section.mr.assignees.join(", ")
+    : "none";
+  const reviewers = section.mr.reviewers && section.mr.reviewers.length > 0
+    ? section.mr.reviewers.join(", ")
+    : "none";
 
   return `
     <details class="mr" open>
       <summary><h3><a href="${escapeHtml(section.mr.webUrl ?? "")}" target="_blank" rel="noopener">!${section.mr.iid}</a> ${escapeHtml(section.mr.title ?? "")}</h3></summary>
       <div class="meta">Merged at ${escapeHtml(section.mergedAt ?? "unknown")}</div>
+      <div class="meta">Author ${escapeHtml(section.mr.authorName ?? "unknown")}</div>
+      <div class="meta">Assignees ${escapeHtml(assignees)}</div>
+      <div class="meta">Reviewers ${escapeHtml(reviewers)}</div>
       ${commits || '<div class="meta">No commits found for this MR.</div>'}
     </details>
   `;
