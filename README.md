@@ -1,6 +1,89 @@
 # Regrizer
 
-Regrizer is a TypeScript CLI that builds an HTML report for a GitLab issue by analyzing merged merge requests and their code changes.
+Regrizer is a TypeScript CLI that builds an HTML report for GitLab issues by analyzing merged merge requests and their code changes.
+
+## Requirements
+
+- Node.js 20+
+- A GitLab token with API access in `GITLAB_TOKEN`
+
+## Install
+
+```bash
+npm install
+```
+
+## Usage
+
+```bash
+npm run build
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html
+```
+
+You can provide `--issue-url` multiple times to analyze several issues in one run and include all of them in a single output HTML report:
+
+```bash
+node dist/src/cli.js \
+  --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
+  --issue-url "https://gitlab.example.com/group/project/-/issues/456" \
+  --output report.html
+```
+
+You can also provide issue URLs from a file with `--issue-url-file` (one issue URL per line; blank lines are ignored):
+
+```bash
+node dist/src/cli.js --issue-url-file ./issues.txt --output report.html
+```
+
+You can combine repeated `--issue-url`, positional URLs, and one or more `--issue-url-file` flags:
+
+```bash
+node dist/src/cli.js \
+  --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
+  --issue-url-file ./issues-team-a.txt \
+  --issue-url-file ./issues-team-b.txt \
+  --output report.html
+```
+
+Additional issue URLs can also be passed positionally after the first `--issue-url` value:
+
+```bash
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" "https://gitlab.example.com/group/project/-/issues/456" --output report.html
+```
+
+The generated `--output` file will contain one section per input issue.
+
+If one issue fails (for example, 404 not found), Regrizer continues analyzing the remaining issues, logs the failure to stderr, and includes a failed-issue section in the final HTML report.
+
+Add `--verbose` to print progress logs in the terminal:
+
+```bash
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html --verbose
+```
+
+Repeat the flag (`--verbose --verbose`) to also print payload-only REST and GraphQL request/response logs:
+
+```bash
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html --verbose --verbose
+```
+
+Or run directly in dev mode:
+
+```bash
+npm run dev -- --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html
+```
+
+### Notes
+
+- Authentication: set a GitLab personal access token in `GITLAB_TOKEN`.
+- Use `--verbose` to print progress and REST/GraphQL call summaries.
+- Use `--verbose --verbose` to print payload-only REST and GraphQL request/response logs.
+- `--issue-url` can be repeated to process several issues in one execution.
+- `--issue-url-file <file>` loads issue URLs from a file (one URL per non-empty line).
+- Binary/unavailable diffs are included with a skip reason.
+- If blame cannot resolve a previous commit for a line, the report marks it as unresolved.
+
+## Report structure
 
 The report hierarchy is:
 
@@ -173,89 +256,9 @@ For readability, repeated consecutive values in these provenance columns are ren
 - merge request
 - related issues
 
-## Requirements
-
-- Node.js 20+
-- A GitLab token with API access in `GITLAB_TOKEN`
-
-## Install
-
-```bash
-npm install
-```
-
-## Usage
-
-```bash
-npm run build
-node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html
-```
-
-You can provide `--issue-url` multiple times to analyze several issues in one run and include all of them in a single output HTML report:
-
-```bash
-node dist/src/cli.js \
-  --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
-  --issue-url "https://gitlab.example.com/group/project/-/issues/456" \
-  --output report.html
-```
-
-You can also provide issue URLs from a file with `--issue-url-file` (one issue URL per line; blank lines are ignored):
-
-```bash
-node dist/src/cli.js --issue-url-file ./issues.txt --output report.html
-```
-
-You can combine repeated `--issue-url`, positional URLs, and one or more `--issue-url-file` flags:
-
-```bash
-node dist/src/cli.js \
-  --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
-  --issue-url-file ./issues-team-a.txt \
-  --issue-url-file ./issues-team-b.txt \
-  --output report.html
-```
-
-Additional issue URLs can also be passed positionally after the first `--issue-url` value:
-
-```bash
-node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" "https://gitlab.example.com/group/project/-/issues/456" --output report.html
-```
-
-The generated `--output` file will contain one section per input issue.
-
-If one issue fails (for example, 404 not found), Regrizer continues analyzing the remaining issues, logs the failure to stderr, and includes a failed-issue section in the final HTML report.
-
-Add `--verbose` to print progress logs in the terminal:
-
-```bash
-node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html --verbose
-```
-
-Repeat the flag (`--verbose --verbose`) to also print payload-only REST and GraphQL request/response logs:
-
-```bash
-node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html --verbose --verbose
-```
-
-Or run directly in dev mode:
-
-```bash
-npm run dev -- --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html
-```
-
 ## Run tests
 
 ```bash
 npm test
 ```
 
-## Notes
-
-- Authentication: set a GitLab personal access token in `GITLAB_TOKEN`.
-- Use `--verbose` to print progress and REST/GraphQL call summaries.
-- Use `--verbose --verbose` to print payload-only REST and GraphQL request/response logs.
-- `--issue-url` can be repeated to process several issues in one execution.
-- `--issue-url-file <file>` loads issue URLs from a file (one URL per non-empty line).
-- Binary/unavailable diffs are included with a skip reason.
-- If blame cannot resolve a previous commit for a line, the report marks it as unresolved.
