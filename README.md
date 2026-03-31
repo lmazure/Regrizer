@@ -25,6 +25,7 @@ The report hierarchy is:
    - changed rows fill before/provenance columns when applicable
 6. Every hierarchy level (MR, commit, file) is collapsible and expanded by default when the report opens
 7. Each commit section shows commit timestamp and committer identity (`Name <email>`) when available
+8. Each merge request section shows merged timestamp plus author, assignees, and reviewers
 
 ## Architecture
 
@@ -155,6 +156,8 @@ No API call in this step.
 The renderer outputs nested `details/summary` sections for issue -> MR -> commit -> file (all `open` by default), with one color-coded unified table per file (`context`, `paired`, `added`, `removed` rows).
 
 Each commit header includes `Committed at ...` and `Committer ...` metadata.
+
+Each merge request header includes `Merged at ...`, `Author ...`, `Assignees ...`, and `Reviewers ...` metadata.
 
 Within a file table, non-overlapping chunk groups are separated by a row containing `…` in every column. Overlapping/adjacent groups are merged into a single contiguous section.
 
