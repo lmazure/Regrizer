@@ -303,7 +303,6 @@ function renderIssueSection(result: AnalysisResult, index: number): string {
       <summary><h2>Issue <a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${result.inputIssue.iid}</a> - ${escapeHtml(result.inputIssue.title)}</h2></summary>
       <div class="meta"><span class="label">Project</span> <a href="${escapeHtml(result.project.web_url)}" target="_blank" rel="noopener">${escapeHtml(result.project.path_with_namespace)}</a></div>
       <div class="meta"><span class="label">Merged MRs analyzed</span> ${result.mergeRequests.length}</div>
-      <div class="meta"><span class="label">Generated at</span> ${escapeHtml(result.generatedAt)}</div>
       ${mrSections || '<div class="mr"><div class="meta">No related merged MRs found.</div></div>'}
     </details>
   `;
@@ -314,6 +313,7 @@ export function renderHtmlReport(result: AnalysisResult): string {
 }
 
 export function renderHtmlReports(results: AnalysisResult[], failedIssues: FailedIssueRenderItem[] = []): string {
+  const generatedAt = results.find((result) => result.generatedAt)?.generatedAt ?? null;
   const successSections = results
     .map((result, index) => renderIssueSection(result, index))
     .join("\n");
@@ -390,6 +390,7 @@ export function renderHtmlReports(results: AnalysisResult[], failedIssues: Faile
   <body>
     <main>
       <h1>Issue Code-Origin Report</h1>
+      ${generatedAt ? `<div class="meta">Generated at ${escapeHtml(generatedAt)}</div>` : ""}
       ${issueSections}
     </main>
   </body>

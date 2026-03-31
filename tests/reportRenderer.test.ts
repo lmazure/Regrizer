@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderHtmlReport } from "../src/reportRenderer.js";
+import { renderHtmlReport, renderHtmlReports } from "../src/reportRenderer.js";
 import { AnalysisResult, ReportChunk, ReportCommit, ReportCommitFile } from "../src/types.js";
 
 function buildResult(files: ReportCommitFile[]): AnalysisResult {
@@ -220,5 +220,16 @@ describe("renderHtmlReport", () => {
     expect((html.match(/<tr class="row-separator">/g) ?? []).length).toBe(2);
     expect(html).toMatch(/<tbody>\s*<tr class="row-separator">/);
     expect(html).toMatch(/<tr class="row-separator">[\s\S]*<\/tr>\s*<\/tbody>/);
+  });
+
+  it("renders generated timestamp once at report level", () => {
+    const first = buildResult([]);
+    const second = buildResult([]);
+    second.generatedAt = "2027-01-01T00:00:00.000Z";
+
+    const html = renderHtmlReports([first, second]);
+
+    expect((html.match(/Generated at /g) ?? []).length).toBe(1);
+    expect(html).toContain(`Generated at ${first.generatedAt}`);
   });
 });
