@@ -259,12 +259,12 @@ function renderCommit(commit: ReportCommit): string {
   const committerText = commit.committerName && commit.committerEmail
     ? `${commit.committerName} <${commit.committerEmail}>`
     : (commit.committerName ?? commit.committerEmail ?? "unknown");
+  const commitMetaLine = `Committed ${commit.committedAt} · Committer: ${committerText}`;
 
   return `
     <details class="commit" open>
       <summary><h4><a href="${escapeHtml(commit.webUrl)}" target="_blank" rel="noopener">${escapeHtml(commit.shortSha)}</a> - ${escapeHtml(commit.title)}</h4></summary>
-      <div class="meta">Committed at ${escapeHtml(commit.committedAt)}</div>
-      <div class="meta">Committer ${escapeHtml(committerText)}</div>
+      <div class="meta">${escapeHtml(commitMetaLine)}</div>
       ${files || '<div class="meta">No files in this commit.</div>'}
     </details>
   `;
@@ -274,20 +274,20 @@ function renderMergeRequest(section: ReportMergeRequest): string {
   const commits = section.commits
     .map((commit) => renderCommit(commit))
     .join("\n");
+  const mergedAt = section.mergedAt ?? "unknown";
+  const author = section.mr.authorName ?? "unknown";
   const assignees = section.mr.assignees && section.mr.assignees.length > 0
     ? section.mr.assignees.join(", ")
     : "none";
   const reviewers = section.mr.reviewers && section.mr.reviewers.length > 0
     ? section.mr.reviewers.join(", ")
     : "none";
+  const mrMetaLine = `Merged ${mergedAt} · Author: ${author} · Assignees: ${assignees} · Reviewers: ${reviewers}`;
 
   return `
     <details class="mr" open>
       <summary><h3><a href="${escapeHtml(section.mr.webUrl ?? "")}" target="_blank" rel="noopener">!${section.mr.iid}</a> ${escapeHtml(section.mr.title ?? "")}</h3></summary>
-      <div class="meta">Merged at ${escapeHtml(section.mergedAt ?? "unknown")}</div>
-      <div class="meta">Author ${escapeHtml(section.mr.authorName ?? "unknown")}</div>
-      <div class="meta">Assignees ${escapeHtml(assignees)}</div>
-      <div class="meta">Reviewers ${escapeHtml(reviewers)}</div>
+      <div class="meta">${escapeHtml(mrMetaLine)}</div>
       ${commits || '<div class="meta">No commits found for this MR.</div>'}
     </details>
   `;

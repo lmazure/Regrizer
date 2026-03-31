@@ -117,10 +117,8 @@ describe("renderHtmlReport", () => {
     expect((html.match(/<table class="code-table">/g) ?? []).length).toBe(2);
     expect((html.match(/<tr class="row-separator">/g) ?? []).length).toBe(1);
     expect((html.match(/>…</g) ?? []).length).toBeGreaterThanOrEqual(6);
-    expect(html).toContain("Committer Ada Lovelace &lt;ada@example.com&gt;");
-    expect(html).toContain("Author Grace Hopper");
-    expect(html).toContain("Assignees Linus Torvalds, Margaret Hamilton");
-    expect(html).toContain("Reviewers Barbara Liskov");
+    expect(html).toContain("Committed 2026-03-30T00:00:00.000Z · Committer: Ada Lovelace &lt;ada@example.com&gt;");
+    expect(html).toContain("Merged 2026-03-30T00:00:00.000Z · Author: Grace Hopper · Assignees: Linus Torvalds, Margaret Hamilton · Reviewers: Barbara Liskov");
   });
 
   it("merges overlapping chunks in the same file and does not render separator between them", () => {
