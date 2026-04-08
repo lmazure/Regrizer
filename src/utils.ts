@@ -43,7 +43,7 @@ export function uniqueNumbers(values: number[]): number[] {
   return [...new Set(values)].sort((a, b) => a - b);
 }
 
-export function chunkSortedNumbers(values: number[], radius = 7): Array<{ start: number; end: number; changed: number[] }> {
+export function chunkSortedNumbers(values: number[], radius: number): Array<{ start: number; end: number; changed: number[] }> {
   if (values.length === 0) {
     return [];
   }

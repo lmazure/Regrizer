@@ -205,7 +205,7 @@ For each changed file:
 - Pre-image (before commit), when parent exists:
   - **REST** [`GET /projects/:project_id/repository/files/:url_encoded_old_path/raw?ref=:first_parent_sha`](https://docs.gitlab.com/api/repository_files/#retrieve-a-raw-file-from-a-repository)
 
-Used to render 7 lines before/after plus exact chunk lines in a single table per file. Unchanged rows only populate the first two columns; changed rows also carry before/provenance metadata.
+Used to render 3 lines before/after plus exact chunk lines in a single table per file. Unchanged rows only populate the first two columns; changed rows also carry before/provenance metadata.
 
 ### 10) Attribute previous commit per old-side line
 

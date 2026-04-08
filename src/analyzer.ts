@@ -170,8 +170,8 @@ export class IssueAnalyzer {
 
     const chunks: ReportChunk[] = [];
     for (const hunk of hunks) {
-      const contextBefore = this.pickContextBefore(postLines, hunk.newStart, 7);
-      const contextAfter = this.pickContextAfter(postLines, hunk.newStart + hunk.newCount - 1, 7);
+      const contextBefore = this.pickContextBefore(postLines, hunk.newStart, 3);
+      const contextAfter = this.pickContextAfter(postLines, hunk.newStart + hunk.newCount - 1, 3);
 
       const afterLines: ReportLine[] = hunk.afterLines.map((line) => ({
         lineNumber: line.lineNumber,
