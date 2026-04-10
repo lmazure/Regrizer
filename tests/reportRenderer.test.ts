@@ -53,6 +53,7 @@ describe("renderHtmlReport", () => {
       {
         filePath: "src/file.ts",
         oldPath: "src/file.ts",
+        isTestFile: false,
         chunks: [
           {
             oldStart: 10,
@@ -91,6 +92,7 @@ describe("renderHtmlReport", () => {
       {
         filePath: "src/other.ts",
         oldPath: "src/other.ts",
+        isTestFile: false,
         chunks: [
           {
             oldStart: 2,
@@ -126,6 +128,7 @@ describe("renderHtmlReport", () => {
       {
         filePath: "src/file.ts",
         oldPath: "src/file.ts",
+        isTestFile: false,
         chunks: [
           {
             oldStart: 5,
@@ -192,6 +195,7 @@ describe("renderHtmlReport", () => {
         filePath: "src/file.ts",
         oldPath: "src/file.ts",
         fileLineCount: 100,
+        isTestFile: false,
         chunks: [
           {
             oldStart: 40,

@@ -20,6 +20,15 @@ npm run build
 node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html
 ```
 
+Classify files as test vs production in the HTML report with `--test-file-glob` (comma-separated list of globs). Any file whose path matches one of the globs is marked as test:
+
+```bash
+node dist/src/cli.js \
+  --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
+  --test-file-glob "**/*.test.ts,**/__tests__/**" \
+  --output report.html
+```
+
 You can provide `--issue-url` multiple times to analyze several issues in one run and include all of them in a single output HTML report:
 
 ```bash
@@ -80,6 +89,7 @@ npm run dev -- --issue-url "https://gitlab.example.com/group/project/-/issues/12
 - Use `--verbose --verbose` to print payload-only REST and GraphQL request/response logs.
 - `--issue-url` can be repeated to process several issues in one execution.
 - `--issue-url-file <file>` loads issue URLs from a file (one URL per non-empty line).
+- `--test-file-glob "glob1,glob2"` marks matching files as test code in the HTML report.
 - Binary/unavailable diffs are included with a skip reason.
 - If blame cannot resolve a previous commit for a line, the report marks it as unresolved.
 

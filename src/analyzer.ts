@@ -155,12 +155,12 @@ export class IssueAnalyzer {
     const oldPath = diff.old_path;
 
     if (!diff.diff || diff.diff.trim().length === 0) {
-      return { filePath, oldPath, chunks: [], skippedReason: "Binary or unavailable diff" };
+      return { filePath, oldPath, chunks: [], isTestFile: false, skippedReason: "Binary or unavailable diff" };
     }
 
     const hunks = parseUnifiedDiffHunks(diff.diff);
     if (hunks.length === 0) {
-      return { filePath, oldPath, chunks: [], skippedReason: "No parseable hunks" };
+      return { filePath, oldPath, chunks: [], isTestFile: false, skippedReason: "No parseable hunks" };
     }
 
     const postLines = await this.safeReadFileLines(projectId, filePath, commit.id);
@@ -218,7 +218,7 @@ export class IssueAnalyzer {
       });
     }
 
-    return { filePath, oldPath, chunks, fileLineCount };
+    return { filePath, oldPath, chunks, fileLineCount, isTestFile: false };
   }
 
   private pickContextBefore(lines: string[] | null, startLine: number, radius: number): ReportLine[] {

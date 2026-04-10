@@ -9,6 +9,7 @@ interface CliArgs {
   issueUrls: string[];
   output: string;
   verboseLevel: number;
+  testFileGlob: string[];
 }
 
 interface FailedIssueAnalysis {
@@ -62,11 +63,15 @@ function parseArgs(argv: string[]): CliArgs {
     issueUrls,
     output: args.get("output") ?? "report.html",
     verboseLevel,
+    testFileGlob: (args.get("test-file-glob") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0),
   };
 }
 
 async function run(): Promise<void> {
-  const { issueUrls, output, verboseLevel } = parseArgs(process.argv);
+  const { issueUrls, output, verboseLevel, testFileGlob } = parseArgs(process.argv);
   const token = process.env.GITLAB_TOKEN;
   if (!token) {
     throw new Error("GITLAB_TOKEN environment variable is required");
@@ -98,7 +103,7 @@ async function run(): Promise<void> {
     throw new Error("All input issues failed to analyze");
   }
 
-  const html = renderHtmlReports(results, failedIssues);
+  const html = renderHtmlReports(results, failedIssues, { testFileGlob });
   await writeFile(output, html, "utf-8");
   logger.log(`HTML report written to ${output}`);
   process.stdout.write(`Report generated: ${output}\n`);
@@ -107,7 +112,7 @@ async function run(): Promise<void> {
 run().catch((error) => {
   process.stderr.write(`Error: ${(error as Error).message}\n`);
   process.stderr.write(
-    "Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--issue-url-file <file> ...] [--output report.html] [--verbose] [--verbose]\n",
+    "Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--issue-url-file <file> ...] [--output report.html] [--test-file-glob \"glob1,glob2\"] [--verbose] [--verbose]\n",
   );
   process.exitCode = 1;
 });

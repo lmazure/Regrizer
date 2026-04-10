@@ -1,9 +1,14 @@
 import { AnalysisResult, ReportChunk, ReportCommit, ReportCommitFile, ReportMergeRequest } from "./types.js";
+import { matchesAnyGlob } from "./globMatcher.js";
 import { escapeHtml } from "./utils.js";
 
 interface FailedIssueRenderItem {
   issueUrl: string;
   errorMessage: string;
+}
+
+interface HtmlRenderOptions {
+  testFileGlob?: string[];
 }
 
 interface ChunkBlock {
@@ -232,10 +237,12 @@ function renderFailedIssueSection(item: FailedIssueRenderItem, index: number): s
 }
 
 function renderFile(file: ReportCommitFile): string {
+  const kindEmoji = file.isTestFile ? "🧪" : "🏭";
+  const fileTitle = `${kindEmoji} ${file.filePath}`;
   if (file.skippedReason) {
     return `
       <details class="file" open>
-        <summary><h5>${escapeHtml(file.filePath)}</h5></summary>
+        <summary><h5>${escapeHtml(fileTitle)}</h5></summary>
         <div class="meta unresolved">${escapeHtml(file.skippedReason)}</div>
       </details>
     `;
@@ -245,7 +252,7 @@ function renderFile(file: ReportCommitFile): string {
 
   return `
     <details class="file" open>
-      <summary><h5>${escapeHtml(file.filePath)}</h5></summary>
+      <summary><h5>${escapeHtml(fileTitle)}</h5></summary>
       <div class="meta">Old path: ${escapeHtml(file.oldPath)}</div>
       ${table}
     </details>
@@ -309,17 +316,39 @@ function renderIssueSection(result: AnalysisResult, index: number): string {
 }
 
 export function renderHtmlReport(result: AnalysisResult): string {
-  return renderHtmlReports([result]);
+  return renderHtmlReports([result], []);
 }
 
-export function renderHtmlReports(results: AnalysisResult[], failedIssues: FailedIssueRenderItem[] = []): string {
-  const generatedAt = results.find((result) => result.generatedAt)?.generatedAt ?? null;
-  const successSections = results
+function withTestFileMarkers(results: AnalysisResult[], testFileGlob: readonly string[]): AnalysisResult[] {
+  return results.map((result) => ({
+    ...result,
+    mergeRequests: result.mergeRequests.map((mr) => ({
+      ...mr,
+      commits: mr.commits.map((commit) => ({
+        ...commit,
+        files: commit.files.map((file) => ({
+          ...file,
+          isTestFile: testFileGlob.length > 0 ? matchesAnyGlob(file.filePath, testFileGlob) : false,
+        })),
+      })),
+    })),
+  }));
+}
+
+export function renderHtmlReports(
+  results: AnalysisResult[],
+  failedIssues: FailedIssueRenderItem[] = [],
+  options: HtmlRenderOptions = {},
+): string {
+  const testFileGlob = options.testFileGlob ?? [];
+  const enriched = withTestFileMarkers(results, testFileGlob);
+  const generatedAt = enriched.find((result) => result.generatedAt)?.generatedAt ?? null;
+  const successSections = enriched
     .map((result, index) => renderIssueSection(result, index))
     .join("\n");
 
   const failedSections = failedIssues
-    .map((item, index) => renderFailedIssueSection(item, results.length + index))
+    .map((item, index) => renderFailedIssueSection(item, enriched.length + index))
     .join("\n");
 
   const issueSections = [successSections, failedSections]

@@ -139,6 +139,7 @@ export interface ReportCommitFile {
   oldPath: string;
   chunks: ReportChunk[];
   fileLineCount?: number | null;
+  isTestFile: boolean;
   skippedReason?: string;
 }
 
