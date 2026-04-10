@@ -7,6 +7,172 @@ interface FailedIssueRenderItem {
   errorMessage: string;
 }
 
+function collectFileRelatedIssues(file: ReportCommitFile): Array<{ webUrl: string; title: string }> {
+  const refs = new Map<string, { webUrl: string; title: string }>();
+  for (const chunk of file.chunks) {
+    for (const row of chunk.rows) {
+      if (row.rowKind === "context") {
+        continue;
+      }
+      for (const issue of row.previousMergeRequestIssues ?? []) {
+        if (!refs.has(issue.webUrl)) {
+          refs.set(issue.webUrl, { webUrl: issue.webUrl, title: issue.title });
+        }
+      }
+    }
+  }
+  return [...refs.values()];
+}
+
+function renderRelatedIssuesInline(issues: Array<{ webUrl: string; title: string }>): string {
+  return issues.length > 0
+    ? issues
+        .map((issue) => `<a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a>`)
+        .join("<br />")
+    : "";
+}
+
+function expandFilesForOverview(
+  issueKey: string,
+  mrKey: string,
+  files: ReportCommitFile[],
+): Array<{ fileKey: string; fileHtml: string; issueHtml: string }> {
+  const expanded: Array<{ fileKey: string; fileHtml: string; issueHtml: string }> = [];
+
+  const uniqueFiles = new Map<string, ReportCommitFile>();
+  for (const file of files) {
+    if (!uniqueFiles.has(file.filePath)) {
+      uniqueFiles.set(file.filePath, file);
+    }
+  }
+
+  for (const file of uniqueFiles.values()) {
+    const issues = collectFileRelatedIssues(file);
+    const fileHtml = `<code>${escapeHtml(file.filePath)}</code>`;
+
+    if (issues.length === 0) {
+      expanded.push({
+        fileKey: `${issueKey}||${mrKey}||${file.filePath}`,
+        fileHtml,
+        issueHtml: "",
+      });
+      continue;
+    }
+
+    for (const issue of issues) {
+      expanded.push({
+        fileKey: `${issueKey}||${mrKey}||${file.filePath}`,
+        fileHtml,
+        issueHtml: renderRelatedIssuesInline([issue]),
+      });
+    }
+  }
+
+  return expanded;
+}
+
+function renderOverviewTable(results: AnalysisResult[]): string {
+  const rows: OverviewRow[] = [];
+
+  for (const result of results) {
+    const issueKey = result.inputIssue.web_url;
+    const issueHtml = `<a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${escapeHtml(String(result.inputIssue.iid))}</a> - ${escapeHtml(result.inputIssue.title)}`;
+
+    for (const mrSection of result.mergeRequests) {
+      const mrKey = `${mrSection.mr.projectId}:${mrSection.mr.iid}`;
+      const mrHtml = `<a href="${escapeHtml(mrSection.mr.webUrl ?? "")}" target="_blank" rel="noopener">!${escapeHtml(String(mrSection.mr.iid))}</a> ${escapeHtml(mrSection.mr.title ?? "")}`;
+
+      const allFiles = mrSection.commits.flatMap((commit) => commit.files);
+      const productionExpanded = expandFilesForOverview(issueKey, mrKey, allFiles.filter((file) => !file.isTestFile));
+      const testExpanded = expandFilesForOverview(issueKey, mrKey, allFiles.filter((file) => file.isTestFile));
+
+      const rowCount = Math.max(1, productionExpanded.length, testExpanded.length);
+      for (let index = 0; index < rowCount; index += 1) {
+        const production = productionExpanded[index] ?? null;
+        const test = testExpanded[index] ?? null;
+
+        rows.push({
+          issueKey,
+          issueHtml,
+          mrKey,
+          mrHtml,
+          productionFileKey: production?.fileKey ?? null,
+          productionFileHtml: production?.fileHtml ?? "",
+          productionIssueHtml: production?.issueHtml ?? "",
+          testFileKey: test?.fileKey ?? null,
+          testFileHtml: test?.fileHtml ?? "",
+          testIssueHtml: test?.issueHtml ?? "",
+        });
+      }
+    }
+  }
+
+  if (rows.length === 0) {
+    return "";
+  }
+
+  const getRowSpan = (values: Array<string | null>, startIndex: number): number => {
+    const current = values[startIndex];
+    if (current === null) {
+      return 1;
+    }
+    let span = 1;
+    while (startIndex + span < values.length && values[startIndex + span] !== null && values[startIndex + span] === current) {
+      span += 1;
+    }
+    return span;
+  };
+
+  const issueKeys = rows.map((row) => row.issueKey);
+  const mrKeys = rows.map((row) => `${row.issueKey}||${row.mrKey}`);
+  const productionFileKeys = rows.map((row) => row.productionFileKey);
+  const testFileKeys = rows.map((row) => row.testFileKey);
+
+  const body = rows
+    .map((row, index) => {
+      const issueCell = index === 0 || issueKeys[index] !== issueKeys[index - 1]
+        ? `<td rowspan="${getRowSpan(issueKeys, index)}">${row.issueHtml}</td>`
+        : "";
+      const mrCell = index === 0 || mrKeys[index] !== mrKeys[index - 1]
+        ? `<td rowspan="${getRowSpan(mrKeys, index)}">${row.mrHtml}</td>`
+        : "";
+      const productionFileCell = row.productionFileKey && (index === 0 || productionFileKeys[index] !== productionFileKeys[index - 1])
+        ? `<td rowspan="${getRowSpan(productionFileKeys, index)}">${row.productionFileHtml}</td>`
+        : (row.productionFileKey ? "" : "<td></td>");
+      const productionIssueCell = row.productionFileKey && (index === 0 || productionFileKeys[index] !== productionFileKeys[index - 1])
+        ? `<td rowspan="${getRowSpan(productionFileKeys, index)}">${row.productionIssueHtml}</td>`
+        : (row.productionFileKey ? "" : "<td></td>");
+      const testFileCell = row.testFileKey && (index === 0 || testFileKeys[index] !== testFileKeys[index - 1])
+        ? `<td rowspan="${getRowSpan(testFileKeys, index)}">${row.testFileHtml}</td>`
+        : (row.testFileKey ? "" : "<td></td>");
+      const testIssueCell = row.testFileKey && (index === 0 || testFileKeys[index] !== testFileKeys[index - 1])
+        ? `<td rowspan="${getRowSpan(testFileKeys, index)}">${row.testIssueHtml}</td>`
+        : (row.testFileKey ? "" : "<td></td>");
+
+      return `<tr>${issueCell}${mrCell}${productionFileCell}${productionIssueCell}${testFileCell}${testIssueCell}</tr>`;
+    })
+    .join("\n");
+
+  return `
+    <section class="overview">
+      <h2>Overview</h2>
+      <table class="overview-table">
+        <thead>
+          <tr>
+            <th>Issue analyzed</th>
+            <th>Merge request</th>
+            <th>Production code file</th>
+            <th>Issue of origin (production)</th>
+            <th>Test code file</th>
+            <th>Issue of origin (tests)</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    </section>
+  `;
+}
+
 interface HtmlRenderOptions {
   testFileGlob?: string[];
 }
@@ -21,6 +187,19 @@ interface ChunkBlock {
 type CommitTableRow =
   | { kind: "data"; row: ReportChunk["rows"][number] }
   | { kind: "separator" };
+
+interface OverviewRow {
+  issueKey: string;
+  issueHtml: string;
+  mrKey: string;
+  mrHtml: string;
+  productionFileKey: string | null;
+  productionFileHtml: string;
+  productionIssueHtml: string;
+  testFileKey: string | null;
+  testFileHtml: string;
+  testIssueHtml: string;
+}
 
 function getChunkEffectiveRange(chunk: ReportChunk): { startLine: number; endLine: number } {
   const lineNumbers = chunk.rows
@@ -343,6 +522,7 @@ export function renderHtmlReports(
   const testFileGlob = options.testFileGlob ?? [];
   const enriched = withTestFileMarkers(results, testFileGlob);
   const generatedAt = enriched.find((result) => result.generatedAt)?.generatedAt ?? null;
+  const overviewSection = renderOverviewTable(enriched);
   const successSections = enriched
     .map((result, index) => renderIssueSection(result, index))
     .join("\n");
@@ -378,6 +558,11 @@ export function renderHtmlReports(
       main { width: 100%; max-width: none; margin: 0; padding: 12px; box-sizing: border-box; }
       .issue-section { margin-top: 20px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
       .issue-section:first-of-type { margin-top: 0; }
+      .overview { margin-top: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+      .overview-table { width: 100%; border-collapse: collapse; table-layout: auto; }
+      .overview-table td, .overview-table th { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
+      .overview-table th { text-align: left; color: var(--muted); font-weight: 600; }
+      .overview-table code { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
       .issue { display: block; }
       .issue > summary { font-weight: 600; }
       h1, h2, h3, h4, h5 { margin: 0 0 8px 0; }
@@ -420,6 +605,7 @@ export function renderHtmlReports(
     <main>
       <h1>Issue Code-Origin Report</h1>
       ${generatedAt ? `<div class="meta">Generated at ${escapeHtml(generatedAt)}</div>` : ""}
+      ${overviewSection}
       ${issueSections}
     </main>
   </body>

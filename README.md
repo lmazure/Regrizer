@@ -97,6 +97,7 @@ npm run dev -- --issue-url "https://gitlab.example.com/group/project/-/issues/12
 
 The report hierarchy is:
 
+0. An overview table at the top of the report summarizing, per input issue and per related merge request, the production/test files touched and the origin issues detected for each file
 1. Merge requests (latest merged first)
 2. Commit selected as the merge result on target branch
 3. Files touched by that commit
