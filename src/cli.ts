@@ -5,6 +5,9 @@ import { Logger } from "./logger.js";
 import { renderHtmlReports } from "./reportRenderer.js";
 import { loadIssueUrlsFromFile, parseGitLabIssueUrl } from "./utils.js";
 
+/**
+ * Normalized CLI argument values.
+ */
 interface CliArgs {
   issueUrls: string[];
   output: string;
@@ -12,11 +15,19 @@ interface CliArgs {
   testFileGlob: string[];
 }
 
+/**
+ * Captures a failed issue analysis for report output.
+ */
 interface FailedIssueAnalysis {
   issueUrl: string;
   errorMessage: string;
 }
 
+/**
+ * Parses process arguments into validated CLI options.
+ * @param argv Process argument array.
+ * @returns Parsed CLI arguments.
+ */
 function parseArgs(argv: string[]): CliArgs {
   const args = new Map<string, string>();
   const issueUrls: string[] = [];
@@ -70,6 +81,10 @@ function parseArgs(argv: string[]): CliArgs {
   };
 }
 
+/**
+ * Executes issue analysis and writes the HTML report.
+ * @returns Promise that resolves when the report is written.
+ */
 async function run(): Promise<void> {
   const { issueUrls, output, verboseLevel, testFileGlob } = parseArgs(process.argv);
   const token = process.env.GITLAB_TOKEN;

@@ -1,7 +1,17 @@
+/**
+ * Normalizes path separators to POSIX-style slashes.
+ * @param value Path value to normalize.
+ * @returns Path with forward slashes.
+ */
 export function normalizePath(value: string): string {
   return value.replaceAll("\\", "/");
 }
 
+/**
+ * Converts a simplified glob pattern to a regular expression.
+ * @param glob Simplified glob pattern.
+ * @returns Compiled regular expression.
+ */
 export function globToRegExp(glob: string): RegExp {
   const normalized = normalizePath(glob).trim();
 
@@ -53,6 +63,12 @@ export function globToRegExp(glob: string): RegExp {
   return new RegExp(`^${source}$`);
 }
 
+/**
+ * Returns true when the given path matches any non-empty glob.
+ * @param path File path to check.
+ * @param globs Glob patterns to evaluate.
+ * @returns True when at least one glob matches.
+ */
 export function matchesAnyGlob(path: string, globs: readonly string[]): boolean {
   if (globs.length === 0) {
     return false;

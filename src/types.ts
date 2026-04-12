@@ -1,17 +1,29 @@
+/**
+ * Parsed components of a GitLab issue URL.
+ */
 export interface ParsedIssueUrl {
   host: string;
   projectPath: string;
   issueIid: number;
 }
 
+/**
+ * Commit-level diff entry returned by GitLab.
+ */
 export interface GitLabCommitDiff extends GitLabMrChange {}
 
+/**
+ * Minimal project payload used by the analyzer.
+ */
 export interface GitLabProject {
   id: number;
   path_with_namespace: string;
   web_url: string;
 }
 
+/**
+ * Minimal issue payload used by the analyzer.
+ */
 export interface GitLabIssue {
   id: number;
   iid: number;
@@ -19,6 +31,9 @@ export interface GitLabIssue {
   web_url: string;
 }
 
+/**
+ * Lightweight merge request reference used across reports.
+ */
 export interface GitLabMergeRequestRef {
   projectId: number;
   iid: number;
@@ -29,11 +44,17 @@ export interface GitLabMergeRequestRef {
   reviewers?: string[];
 }
 
+/**
+ * Lightweight GitLab user representation.
+ */
 export interface GitLabUserRef {
   name?: string;
   username?: string;
 }
 
+/**
+ * Lightweight commit representation returned in commit listings.
+ */
 export interface GitLabCommitRef {
   id: string;
   short_id?: string;
@@ -45,6 +66,9 @@ export interface GitLabCommitRef {
   web_url?: string;
 }
 
+/**
+ * Detailed commit payload returned by commit detail endpoints.
+ */
 export interface GitLabCommitDetail {
   id: string;
   short_id: string;
@@ -58,6 +82,9 @@ export interface GitLabCommitDetail {
   web_url: string;
 }
 
+/**
+ * Detailed merge request payload used during analysis.
+ */
 export interface GitLabMergeRequest {
   id: number;
   iid: number;
@@ -77,6 +104,9 @@ export interface GitLabMergeRequest {
   reviewers?: GitLabUserRef[];
 }
 
+/**
+ * File-level change entry in merge request and commit diff responses.
+ */
 export interface GitLabMrChange {
   old_path: string;
   new_path: string;
@@ -86,11 +116,17 @@ export interface GitLabMrChange {
   deleted_file: boolean;
 }
 
+/**
+ * Lightweight issue reference related to a merge request.
+ */
 export interface RelatedIssueRef {
   title: string;
   webUrl: string;
 }
 
+/**
+ * Provenance metadata resolved for a changed line.
+ */
 export interface LineProvenance {
   lineBeforeNumber: number | null;
   lineBeforeText: string | null;
@@ -104,6 +140,9 @@ export interface LineProvenance {
   unresolvedReason?: string;
 }
 
+/**
+ * A rendered line in a report, with optional provenance details.
+ */
 export interface ReportLine {
   lineNumber: number | null;
   text: string;
@@ -114,6 +153,9 @@ export interface ReportLine {
   unresolvedReason?: string;
 }
 
+/**
+ * A row rendered in the report table for a diff chunk.
+ */
 export interface ReportChunkRow {
   lineNumber: number | null;
   afterText: string;
@@ -126,6 +168,9 @@ export interface ReportChunkRow {
   rowKind: "context" | "added" | "removed" | "paired";
 }
 
+/**
+ * A diff chunk represented for report rendering.
+ */
 export interface ReportChunk {
   oldStart: number;
   oldCount: number;
@@ -134,6 +179,9 @@ export interface ReportChunk {
   rows: ReportChunkRow[];
 }
 
+/**
+ * A file section included in a report commit.
+ */
 export interface ReportCommitFile {
   filePath: string;
   oldPath: string;
@@ -143,6 +191,9 @@ export interface ReportCommitFile {
   skippedReason?: string;
 }
 
+/**
+ * A commit section included in a report merge request.
+ */
 export interface ReportCommit {
   sha: string;
   shortSha: string;
@@ -156,12 +207,18 @@ export interface ReportCommit {
   files: ReportCommitFile[];
 }
 
+/**
+ * A merge request section included in a full analysis report.
+ */
 export interface ReportMergeRequest {
   mr: GitLabMergeRequestRef;
   mergedAt: string | null;
   commits: ReportCommit[];
 }
 
+/**
+ * Top-level analysis output for a single input issue.
+ */
 export interface AnalysisResult {
   inputIssue: GitLabIssue;
   project: GitLabProject;

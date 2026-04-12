@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { ParsedIssueUrl } from "./types.js";
 
+/**
+ * Parses and validates a GitLab issue URL into structured components.
+ * @param issueUrl Raw GitLab issue URL.
+ * @returns Parsed issue URL fields.
+ */
 export function parseGitLabIssueUrl(issueUrl: string): ParsedIssueUrl {
   let parsed: URL;
   try {
@@ -22,6 +27,11 @@ export function parseGitLabIssueUrl(issueUrl: string): ParsedIssueUrl {
   };
 }
 
+/**
+ * Extracts non-empty issue URLs from newline-delimited file content.
+ * @param content Raw file contents.
+ * @returns Trimmed non-empty issue URLs.
+ */
 export function parseIssueUrlsFromFileContent(content: string): string[] {
   return content
     .split(/\r?\n/)
@@ -29,6 +39,11 @@ export function parseIssueUrlsFromFileContent(content: string): string[] {
     .filter((line) => line.length > 0);
 }
 
+/**
+ * Loads issue URLs from a text file.
+ * @param filePath Input file path.
+ * @returns Parsed issue URLs.
+ */
 export function loadIssueUrlsFromFile(filePath: string): string[] {
   try {
     const content = readFileSync(filePath, "utf-8");
@@ -39,10 +54,21 @@ export function loadIssueUrlsFromFile(filePath: string): string[] {
   }
 }
 
+/**
+ * Returns unique numbers in ascending order.
+ * @param values Input numeric values.
+ * @returns Unique sorted numbers.
+ */
 export function uniqueNumbers(values: number[]): number[] {
   return [...new Set(values)].sort((a, b) => a - b);
 }
 
+/**
+ * Groups sorted line numbers into radius-expanded contiguous chunks.
+ * @param values Changed line numbers.
+ * @param radius Context radius around each changed line.
+ * @returns Merged contiguous line chunks.
+ */
 export function chunkSortedNumbers(values: number[], radius: number): Array<{ start: number; end: number; changed: number[] }> {
   if (values.length === 0) {
     return [];
@@ -80,6 +106,11 @@ export function chunkSortedNumbers(values: number[], radius: number): Array<{ st
   return chunks;
 }
 
+/**
+ * Escapes HTML-sensitive characters for safe inline rendering.
+ * @param input Raw text content.
+ * @returns Escaped HTML-safe text.
+ */
 export function escapeHtml(input: string): string {
   return input
     .replaceAll("&", "&amp;")

@@ -17,18 +17,34 @@ import {
   ReportMergeRequest,
 } from "./types.js";
 
+/**
+ * Resolved provenance context attached to a previously introduced commit.
+ */
 interface PreviousCommitContext {
   commitWebUrl: string | null;
   mergeRequest: GitLabMergeRequestRef | null;
   mergeRequestIssues: RelatedIssueRef[];
 }
 
+/**
+ * Analyzes a GitLab issue and resolves code-origin provenance for changed lines.
+ */
 export class IssueAnalyzer {
   private readonly blameCache = new Map<string, string | null>();
   private readonly previousCommitContextCache = new Map<string, PreviousCommitContext | null>();
 
+  /**
+   * Creates an issue analyzer backed by the GitLab client.
+   * @param client GitLab API client.
+   * @param logger Logger instance.
+   */
   constructor(private readonly client: GitLabClient, private readonly logger: Logger) {}
 
+  /**
+   * Runs full analysis for a parsed issue URL.
+   * @param input Parsed issue URL input.
+   * @returns Complete analysis result for the issue.
+   */
   async analyze(input: ParsedIssueUrl): Promise<AnalysisResult> {
     this.logger.log(`Resolving project ${input.projectPath}`);
     const project = await this.client.getProjectByPath(input.projectPath);
@@ -67,6 +83,11 @@ export class IssueAnalyzer {
     };
   }
 
+  /**
+   * Loads merge request details and keeps only merged entries.
+   * @param refs Candidate merge request references.
+   * @returns Sorted merged merge request details.
+   */
   private async loadMergedMergeRequests(refs: GitLabMergeRequestRef[]): Promise<GitLabMergeRequest[]> {
     const merged: GitLabMergeRequest[] = [];
 
@@ -91,6 +112,11 @@ export class IssueAnalyzer {
     return merged;
   }
 
+  /**
+   * Resolves the effective merged commit for a merge request and analyzes its files.
+   * @param mr Merge request to analyze.
+   * @returns Report commit entries derived from the merged target-branch commit.
+   */
   private async analyzeMergeRequestCommits(mr: GitLabMergeRequest): Promise<ReportCommit[]> {
     const mergedCommitRef = this.resolveMergedTargetBranchCommit(mr);
     if (!mergedCommitRef) {
@@ -123,6 +149,11 @@ export class IssueAnalyzer {
     }];
   }
 
+  /**
+   * Chooses the best available commit SHA representing merged target-branch content.
+   * @param mr Merge request metadata.
+   * @returns Selected commit reference source or null when unavailable.
+   */
   private resolveMergedTargetBranchCommit(mr: GitLabMergeRequest): { sha: string; source: string } | null {
     if (mr.merge_commit_sha) {
       return { sha: mr.merge_commit_sha, source: "merge_commit_sha" };
@@ -139,6 +170,12 @@ export class IssueAnalyzer {
     return null;
   }
 
+  /**
+   * Analyzes all file diffs for a commit.
+   * @param projectId GitLab project ID.
+   * @param commit Commit detail payload.
+   * @returns Report file entries for all commit diffs.
+   */
   private async analyzeCommitFiles(projectId: number, commit: GitLabCommitDetail): Promise<ReportCommitFile[]> {
     const diffs = await this.client.getCommitDiffs(projectId, commit.id);
     const files: ReportCommitFile[] = [];
@@ -150,6 +187,13 @@ export class IssueAnalyzer {
     return files;
   }
 
+  /**
+   * Builds a report file section from a single commit diff.
+   * @param projectId GitLab project ID.
+   * @param commit Commit detail payload.
+   * @param diff Commit diff payload for one file.
+   * @returns Report file section with rendered chunk rows.
+   */
   private async analyzeCommitFile(projectId: number, commit: GitLabCommitDetail, diff: GitLabCommitDiff): Promise<ReportCommitFile> {
     const filePath = diff.new_path;
     const oldPath = diff.old_path;
@@ -221,6 +265,13 @@ export class IssueAnalyzer {
     return { filePath, oldPath, chunks, fileLineCount, isTestFile: false };
   }
 
+  /**
+   * Returns context lines before a changed range.
+   * @param lines File lines after change.
+   * @param startLine First changed line number.
+   * @param radius Number of context lines.
+   * @returns Context lines that precede the changed range.
+   */
   private pickContextBefore(lines: string[] | null, startLine: number, radius: number): ReportLine[] {
     if (!lines) {
       return [];
@@ -235,6 +286,15 @@ export class IssueAnalyzer {
     return out;
   }
 
+  /**
+   * Builds table rows for a diff chunk, including paired added/removed lines.
+   * @param contextBefore Context lines before changes.
+   * @param entries Parsed hunk entries.
+   * @param afterLines Added/after lines.
+   * @param beforeLines Removed/before lines with provenance.
+   * @param contextAfter Context lines after changes.
+   * @returns Normalized chunk rows for report rendering.
+   */
   private buildChunkRows(
     contextBefore: ReportLine[],
     entries: ParsedHunkEntry[],
@@ -349,6 +409,13 @@ export class IssueAnalyzer {
     return rows;
   }
 
+  /**
+   * Returns context lines after a changed range.
+   * @param lines File lines after change.
+   * @param endLine Last changed line number.
+   * @param radius Number of context lines.
+   * @returns Context lines that follow the changed range.
+   */
   private pickContextAfter(lines: string[] | null, endLine: number, radius: number): ReportLine[] {
     if (!lines) {
       return [];
@@ -363,6 +430,14 @@ export class IssueAnalyzer {
     return out;
   }
 
+  /**
+   * Resolves the introducing commit SHA for a line from the pre-change file state.
+   * @param projectId GitLab project ID.
+   * @param filePath File path in repository.
+   * @param parentRef Parent commit SHA/ref.
+   * @param lineNumber Target line number.
+   * @returns Introducing commit SHA or null.
+   */
   private async resolvePreviousCommitForPreLine(
     projectId: number,
     filePath: string,
@@ -379,6 +454,12 @@ export class IssueAnalyzer {
     return sha;
   }
 
+  /**
+   * Resolves and caches commit/MR/issue context for a previous commit SHA.
+   * @param projectId GitLab project ID.
+   * @param commitSha Commit SHA to resolve.
+   * @returns Previous commit context or null when unavailable.
+   */
   private async resolvePreviousCommitContext(projectId: number, commitSha: string): Promise<PreviousCommitContext | null> {
     const key = `${projectId}:${commitSha}`;
     if (this.previousCommitContextCache.has(key)) {
@@ -406,6 +487,13 @@ export class IssueAnalyzer {
     }
   }
 
+  /**
+   * Reads file contents and splits them into lines, returning null on failure.
+   * @param projectId GitLab project ID.
+   * @param filePath File path in repository.
+   * @param ref Commit SHA/ref to read from.
+   * @returns File lines or null when reading fails.
+   */
   private async safeReadFileLines(projectId: number, filePath: string, ref: string): Promise<string[] | null> {
     try {
       const raw = await this.client.getFileRaw(projectId, filePath, ref);
@@ -415,6 +503,12 @@ export class IssueAnalyzer {
     }
   }
 
+  /**
+   * Loads commit detail and returns null when the lookup fails.
+   * @param projectId GitLab project ID.
+   * @param sha Commit SHA.
+   * @returns Commit details or null when unavailable.
+   */
   private async safeGetCommitDetail(projectId: number, sha: string): Promise<GitLabCommitDetail | null> {
     try {
       return await this.client.getCommit(projectId, sha);
@@ -423,6 +517,11 @@ export class IssueAnalyzer {
     }
   }
 
+  /**
+   * Produces a user-facing display name from available user fields.
+   * @param user GitLab user-like object.
+   * @returns Preferred display name.
+   */
   private toDisplayName(user: { name?: string; username?: string } | null | undefined): string {
     return user?.name ?? user?.username ?? "unknown";
   }

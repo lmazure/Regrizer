@@ -2,11 +2,19 @@ import { AnalysisResult, ReportChunk, ReportCommit, ReportCommitFile, ReportMerg
 import { matchesAnyGlob } from "./globMatcher.js";
 import { escapeHtml } from "./utils.js";
 
+/**
+ * Failed issue item rendered in the final HTML output.
+ */
 interface FailedIssueRenderItem {
   issueUrl: string;
   errorMessage: string;
 }
 
+/**
+ * Collects unique related issues referenced by changed rows in a file.
+ * @param file Report commit file.
+ * @returns Unique related issue references.
+ */
 function collectFileRelatedIssues(file: ReportCommitFile): Array<{ webUrl: string; title: string }> {
   const refs = new Map<string, { webUrl: string; title: string }>();
   for (const chunk of file.chunks) {
@@ -24,6 +32,11 @@ function collectFileRelatedIssues(file: ReportCommitFile): Array<{ webUrl: strin
   return [...refs.values()];
 }
 
+/**
+ * Renders related issue links as an inline HTML fragment.
+ * @param issues Related issue references.
+ * @returns Inline HTML string.
+ */
 function renderRelatedIssuesInline(issues: Array<{ webUrl: string; title: string }>): string {
   return issues.length > 0
     ? issues
@@ -32,6 +45,13 @@ function renderRelatedIssuesInline(issues: Array<{ webUrl: string; title: string
     : "";
 }
 
+/**
+ * Expands files into overview rows including linked related issues.
+ * @param issueKey Stable issue key.
+ * @param mrKey Stable merge request key.
+ * @param files Files to expand.
+ * @returns Expanded overview file rows.
+ */
 function expandFilesForOverview(
   issueKey: string,
   mrKey: string,
@@ -71,6 +91,11 @@ function expandFilesForOverview(
   return expanded;
 }
 
+/**
+ * Renders the top-level overview table for all analyzed issues.
+ * @param results Analysis results collection.
+ * @returns HTML overview section.
+ */
 function renderOverviewTable(results: AnalysisResult[]): string {
   const rows: OverviewRow[] = [];
 
@@ -173,10 +198,16 @@ function renderOverviewTable(results: AnalysisResult[]): string {
   `;
 }
 
+/**
+ * Optional controls for report rendering behavior.
+ */
 interface HtmlRenderOptions {
   testFileGlob?: string[];
 }
 
+/**
+ * Intermediate merged block of rendered chunk rows for one file.
+ */
 interface ChunkBlock {
   filePath: string;
   startLine: number;
@@ -188,6 +219,9 @@ type CommitTableRow =
   | { kind: "data"; row: ReportChunk["rows"][number] }
   | { kind: "separator" };
 
+/**
+ * Expanded row model used to render overview table row spans.
+ */
 interface OverviewRow {
   issueKey: string;
   issueHtml: string;
@@ -201,6 +235,11 @@ interface OverviewRow {
   testIssueHtml: string;
 }
 
+/**
+ * Computes the effective visible line range represented by a chunk.
+ * @param chunk Report chunk.
+ * @returns Effective start and end line numbers.
+ */
 function getChunkEffectiveRange(chunk: ReportChunk): { startLine: number; endLine: number } {
   const lineNumbers = chunk.rows
     .map((row) => row.lineNumber)
@@ -218,6 +257,11 @@ function getChunkEffectiveRange(chunk: ReportChunk): { startLine: number; endLin
   return { startLine, endLine };
 }
 
+/**
+ * Builds a stable signature for deduplicating chunk row overlaps.
+ * @param row Report row.
+ * @returns Stable row signature string.
+ */
 function rowSignature(row: ReportChunk["rows"][number]): string {
   return JSON.stringify([
     row.rowKind,
@@ -233,6 +277,12 @@ function rowSignature(row: ReportChunk["rows"][number]): string {
   ]);
 }
 
+/**
+ * Finds the largest overlap between adjacent block row boundaries.
+ * @param leftRows Left block rows.
+ * @param rightRows Right block rows.
+ * @returns Number of overlapping rows.
+ */
 function findBoundaryOverlapLength(leftRows: ReportChunk["rows"], rightRows: ReportChunk["rows"]): number {
   const maxOverlap = Math.min(leftRows.length, rightRows.length);
 
@@ -254,6 +304,11 @@ function findBoundaryOverlapLength(leftRows: ReportChunk["rows"], rightRows: Rep
   return 0;
 }
 
+/**
+ * Merges adjacent or overlapping chunk blocks for a file.
+ * @param blocks Chunk blocks sorted by line range.
+ * @returns Merged chunk blocks.
+ */
 function mergeOverlappingBlocks(blocks: ChunkBlock[]): ChunkBlock[] {
   if (blocks.length <= 1) {
     return blocks;
@@ -276,6 +331,11 @@ function mergeOverlappingBlocks(blocks: ChunkBlock[]): ChunkBlock[] {
   return merged;
 }
 
+/**
+ * Builds normalized table rows for a file section in the report.
+ * @param file Report commit file.
+ * @returns Commit table row models.
+ */
 function buildFileTableRows(file: ReportCommitFile): CommitTableRow[] {
   const blocks = file.chunks
     .map((chunk) => {
@@ -321,6 +381,11 @@ function buildFileTableRows(file: ReportCommitFile): CommitTableRow[] {
   return rows;
 }
 
+/**
+ * Renders HTML rows for a commit file table, including row spans.
+ * @param rows Commit table row models.
+ * @returns HTML table rows.
+ */
 function renderCommitTableRows(rows: CommitTableRow[]): string {
   const commitValues = rows.map((item) => {
     if (item.kind === "separator") {
@@ -394,6 +459,11 @@ function renderCommitTableRows(rows: CommitTableRow[]): string {
     .join("\n");
 }
 
+/**
+ * Renders one file-level code/provenance table.
+ * @param file Report commit file.
+ * @returns HTML file table.
+ */
 function renderFileTable(file: ReportCommitFile): string {
   const rows = renderCommitTableRows(buildFileTableRows(file));
 
@@ -405,6 +475,12 @@ function renderFileTable(file: ReportCommitFile): string {
   `;
 }
 
+/**
+ * Renders a failed issue section when analysis errors occur.
+ * @param item Failed issue render item.
+ * @param index Display index.
+ * @returns HTML failed issue section.
+ */
 function renderFailedIssueSection(item: FailedIssueRenderItem, index: number): string {
   return `
     <details class="issue-section issue failed-issue" open>
@@ -415,6 +491,11 @@ function renderFailedIssueSection(item: FailedIssueRenderItem, index: number): s
   `;
 }
 
+/**
+ * Renders a file details block and its table content.
+ * @param file Report commit file.
+ * @returns HTML file details block.
+ */
 function renderFile(file: ReportCommitFile): string {
   const kindEmoji = file.isTestFile ? "🧪" : "🏭";
   const fileTitle = `${kindEmoji} ${file.filePath}`;
@@ -438,6 +519,11 @@ function renderFile(file: ReportCommitFile): string {
   `;
 }
 
+/**
+ * Renders a commit details block and nested file sections.
+ * @param commit Report commit.
+ * @returns HTML commit details block.
+ */
 function renderCommit(commit: ReportCommit): string {
   const files = commit.files
     .map((file) => renderFile(file))
@@ -456,6 +542,11 @@ function renderCommit(commit: ReportCommit): string {
   `;
 }
 
+/**
+ * Renders a merge request details block and nested commits.
+ * @param section Report merge request section.
+ * @returns HTML merge request details block.
+ */
 function renderMergeRequest(section: ReportMergeRequest): string {
   const commits = section.commits
     .map((commit) => renderCommit(commit))
@@ -479,6 +570,12 @@ function renderMergeRequest(section: ReportMergeRequest): string {
   `;
 }
 
+/**
+ * Renders one analyzed issue section with all related merge requests.
+ * @param result Analysis result for one issue.
+ * @param index Display index.
+ * @returns HTML issue section.
+ */
 function renderIssueSection(result: AnalysisResult, index: number): string {
   const mrSections = result.mergeRequests
     .map((section) => renderMergeRequest(section))
@@ -494,10 +591,21 @@ function renderIssueSection(result: AnalysisResult, index: number): string {
   `;
 }
 
+/**
+ * Renders a single-result HTML report for compatibility callers.
+ * @param result Analysis result for one issue.
+ * @returns Full HTML report string.
+ */
 export function renderHtmlReport(result: AnalysisResult): string {
   return renderHtmlReports([result], []);
 }
 
+/**
+ * Marks files as test files according to configured glob patterns.
+ * @param results Analysis results.
+ * @param testFileGlob Test file glob patterns.
+ * @returns Results with test-file markers applied.
+ */
 function withTestFileMarkers(results: AnalysisResult[], testFileGlob: readonly string[]): AnalysisResult[] {
   return results.map((result) => ({
     ...result,
@@ -514,6 +622,13 @@ function withTestFileMarkers(results: AnalysisResult[], testFileGlob: readonly s
   }));
 }
 
+/**
+ * Renders a complete HTML report for successful and failed analyses.
+ * @param results Successful analysis results.
+ * @param failedIssues Failed issue entries.
+ * @param options Rendering options.
+ * @returns Complete HTML document string.
+ */
 export function renderHtmlReports(
   results: AnalysisResult[],
   failedIssues: FailedIssueRenderItem[] = [],

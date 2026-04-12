@@ -1,10 +1,16 @@
 import { uniqueNumbers } from "./utils.js";
 
+/**
+ * A single line in a parsed diff with its target line number.
+ */
 export interface ParsedDiffLine {
   lineNumber: number | null;
   text: string;
 }
 
+/**
+ * One normalized entry inside a parsed unified diff hunk.
+ */
 export interface ParsedHunkEntry {
   kind: "context" | "added" | "removed";
   oldLineNumber: number | null;
@@ -12,6 +18,9 @@ export interface ParsedHunkEntry {
   text: string;
 }
 
+/**
+ * Parsed representation of a unified diff hunk.
+ */
 export interface ParsedDiffHunk {
   oldStart: number;
   oldCount: number;
@@ -24,6 +33,11 @@ export interface ParsedDiffHunk {
   afterLines: ParsedDiffLine[];
 }
 
+/**
+ * Extracts changed line numbers from the new side of a unified diff.
+ * @param diff Unified diff text.
+ * @returns Unique changed line numbers on the new side.
+ */
 export function extractChangedNewLineNumbers(diff: string): number[] {
   const lines = diff.split("\n");
   const changed: number[] = [];
@@ -65,6 +79,11 @@ export function extractChangedNewLineNumbers(diff: string): number[] {
   return uniqueNumbers(changed);
 }
 
+/**
+ * Parses unified diff text into structured hunk objects.
+ * @param diff Unified diff text.
+ * @returns Parsed diff hunks.
+ */
 export function parseUnifiedDiffHunks(diff: string): ParsedDiffHunk[] {
   const lines = diff.split("\n");
   const hunks: ParsedDiffHunk[] = [];

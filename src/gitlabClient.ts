@@ -11,11 +11,17 @@ import {
 } from "./types.js";
 import { Logger } from "./logger.js";
 
+/**
+ * Generic GraphQL response envelope.
+ */
 interface GraphQlResponse<T> {
   data?: T;
   errors?: Array<{ message: string }>;
 }
 
+/**
+ * GraphQL payload shape for issue reference and closed-by MR lookups.
+ */
 interface IssueMrGraphQlData {
   project: {
     issue: {
@@ -32,6 +38,9 @@ interface IssueMrGraphQlData {
   } | null;
 }
 
+/**
+ * GraphQL payload shape for merge request related issue lookups.
+ */
 interface MergeRequestIssuesGraphQlData {
   project: {
     mergeRequest: {
@@ -43,16 +52,30 @@ interface MergeRequestIssuesGraphQlData {
   } | null;
 }
 
+/**
+ * GitLab API client wrapping REST and GraphQL operations used by analysis.
+ */
 export class GitLabClient {
   private readonly apiBaseUrl: string;
   private readonly graphQlUrl: string;
   private readonly projectPathToId = new Map<string, number>();
 
+  /**
+   * Creates a GitLab client for a host and personal access token.
+   * @param host GitLab host URL.
+   * @param token Personal access token.
+   * @param logger Logger instance.
+   */
   constructor(private readonly host: string, private readonly token: string, private readonly logger: Logger) {
     this.apiBaseUrl = `${host.replace(/\/$/, "")}/api/v4`;
     this.graphQlUrl = `${host.replace(/\/$/, "")}/api/graphql`;
   }
 
+  /**
+   * Retrieves project metadata by full project path.
+   * @param projectPath Full GitLab project path.
+   * @returns Project metadata payload.
+   */
   async getProjectByPath(projectPath: string): Promise<GitLabProject> {
     const encoded = encodeURIComponent(projectPath);
     const project = await this.requestJson<GitLabProject>(`/projects/${encoded}`);
@@ -60,10 +83,22 @@ export class GitLabClient {
     return project;
   }
 
+  /**
+   * Retrieves a project issue by project ID and issue IID.
+   * @param projectId GitLab project ID.
+   * @param issueIid Issue IID in project.
+   * @returns Issue metadata payload.
+   */
   async getIssue(projectId: number, issueIid: number): Promise<GitLabIssue> {
     return this.requestJson<GitLabIssue>(`/projects/${projectId}/issues/${issueIid}`);
   }
 
+  /**
+   * Resolves the full issue reference using GraphQL.
+   * @param projectPath Full GitLab project path.
+   * @param issueIid Issue IID.
+   * @returns Full issue reference string.
+   */
   async getIssueReferenceFull(projectPath: string, issueIid: number): Promise<string> {
     const query = `
       query IssueReference($fullPath: ID!, $iid: String!) {
@@ -83,6 +118,12 @@ export class GitLabClient {
     return payload.project?.issue?.reference ?? `${projectPath}#${issueIid}`;
   }
 
+  /**
+   * Collects merge request references related to an issue.
+   * @param project Project metadata.
+   * @param issue Issue metadata.
+   * @returns Unique related merge request references.
+   */
   async getIssueRelatedMergeRequestRefs(
     project: GitLabProject,
     issue: GitLabIssue,
@@ -129,10 +170,22 @@ export class GitLabClient {
     return values;
   }
 
+  /**
+   * Retrieves a merge request by project ID and MR IID.
+   * @param projectId GitLab project ID.
+   * @param mrIid Merge request IID.
+   * @returns Merge request details.
+   */
   async getMergeRequest(projectId: number, mrIid: number): Promise<GitLabMergeRequest> {
     return this.requestJson<GitLabMergeRequest>(`/projects/${projectId}/merge_requests/${mrIid}`);
   }
 
+  /**
+   * Retrieves merge request file changes in unified diff form.
+   * @param projectId GitLab project ID.
+   * @param mrIid Merge request IID.
+   * @returns Merge request file changes.
+   */
   async getMergeRequestChanges(projectId: number, mrIid: number): Promise<GitLabMrChange[]> {
     const data = await this.requestJson<{ changes: GitLabMrChange[] }>(
       `/projects/${projectId}/merge_requests/${mrIid}/changes`,
@@ -141,18 +194,43 @@ export class GitLabClient {
     return data.changes ?? [];
   }
 
+  /**
+   * Retrieves commit references associated with a merge request.
+   * @param projectId GitLab project ID.
+   * @param mrIid Merge request IID.
+   * @returns Commit references for the merge request.
+   */
   async getMergeRequestCommits(projectId: number, mrIid: number): Promise<GitLabCommitRef[]> {
     return this.requestJson<GitLabCommitRef[]>(`/projects/${projectId}/merge_requests/${mrIid}/commits`);
   }
 
+  /**
+   * Retrieves detailed commit metadata by SHA.
+   * @param projectId GitLab project ID.
+   * @param sha Commit SHA.
+   * @returns Commit detail payload.
+   */
   async getCommit(projectId: number, sha: string): Promise<GitLabCommitDetail> {
     return this.requestJson<GitLabCommitDetail>(`/projects/${projectId}/repository/commits/${sha}`);
   }
 
+  /**
+   * Retrieves file-level diffs for a commit.
+   * @param projectId GitLab project ID.
+   * @param sha Commit SHA.
+   * @returns Commit diff entries.
+   */
   async getCommitDiffs(projectId: number, sha: string): Promise<GitLabCommitDiff[]> {
     return this.requestJson<GitLabCommitDiff[]>(`/projects/${projectId}/repository/commits/${sha}/diff`);
   }
 
+  /**
+   * Reads raw file contents for a project file at a given ref.
+   * @param projectId GitLab project ID.
+   * @param filePath Repository file path.
+   * @param ref Commit SHA/ref.
+   * @returns Raw file content text.
+   */
   async getFileRaw(projectId: number, filePath: string, ref: string): Promise<string> {
     const encodedPath = encodeURIComponent(filePath);
     const response = await fetch(`${this.apiBaseUrl}/projects/${projectId}/repository/files/${encodedPath}/raw?ref=${encodeURIComponent(ref)}`, {
@@ -166,6 +244,14 @@ export class GitLabClient {
     return response.text();
   }
 
+  /**
+   * Returns the commit SHA from blame for a single file line.
+   * @param projectId GitLab project ID.
+   * @param filePath Repository file path.
+   * @param ref Commit SHA/ref.
+   * @param lineNumber Target line number.
+   * @returns Blame commit SHA or null.
+   */
   async getBlameCommitShaForLine(projectId: number, filePath: string, ref: string, lineNumber: number): Promise<string | null> {
     if (lineNumber < 1) {
       return null;
@@ -183,6 +269,12 @@ export class GitLabClient {
     return rows[0]?.commit?.id ?? null;
   }
 
+  /**
+   * Retrieves merged merge requests associated with a commit.
+   * @param projectId GitLab project ID.
+   * @param sha Commit SHA.
+   * @returns Merged merge request references.
+   */
   async getMergeRequestsForCommit(projectId: number, sha: string): Promise<GitLabMergeRequestRef[]> {
     const mergedOnly = await this.safeRequest(
       () =>
@@ -202,6 +294,12 @@ export class GitLabClient {
       }));
   }
 
+  /**
+   * Retrieves issues that are closed or related to a merge request.
+   * @param projectId GitLab project ID.
+   * @param mrIid Merge request IID.
+   * @returns Related issue references.
+   */
   async getIssuesClosedByMergeRequest(projectId: number, mrIid: number): Promise<RelatedIssueRef[]> {
     const closesIssues = await this.safeRequest(
       () => this.requestJson<Array<{ title: string; web_url: string }>>(`/projects/${projectId}/merge_requests/${mrIid}/closes_issues`),
@@ -229,6 +327,12 @@ export class GitLabClient {
     return graphql;
   }
 
+  /**
+   * Resolves MRs closing an issue using GraphQL fallback.
+   * @param projectPath Full GitLab project path.
+   * @param issueIid Issue IID.
+   * @returns Merge request references that close the issue.
+   */
   private async getIssueClosedByMergeRequestsGraphQl(projectPath: string, issueIid: number): Promise<GitLabMergeRequestRef[]> {
     const query = `
       query ClosedByMergeRequests($fullPath: ID!, $iid: String!) {
@@ -269,6 +373,12 @@ export class GitLabClient {
     return refs;
   }
 
+  /**
+   * Resolves MR closing issues using GraphQL fallback.
+   * @param projectId GitLab project ID.
+   * @param mrIid Merge request IID.
+   * @returns Related issue references from GraphQL.
+   */
   private async getIssuesClosedByMergeRequestGraphQl(projectId: number, mrIid: number): Promise<RelatedIssueRef[]> {
     const project = await this.requestJson<GitLabProject>(`/projects/${projectId}`);
     const query = `
@@ -295,6 +405,11 @@ export class GitLabClient {
     })) ?? [];
   }
 
+  /**
+   * Searches merged merge requests by free-text query.
+   * @param search Search query string.
+   * @returns Matching merged merge request references.
+   */
   private async searchMergeRequests(search: string): Promise<GitLabMergeRequestRef[]> {
     const result = await this.safeRequest(
       () =>
@@ -315,6 +430,12 @@ export class GitLabClient {
       }));
   }
 
+  /**
+   * Extracts merge request references from arbitrary text.
+   * @param text Text to inspect.
+   * @param defaultProjectPath Default project path for shorthand references.
+   * @returns Extracted merge request references.
+   */
   private async extractMrRefsFromText(text: string, defaultProjectPath: string): Promise<GitLabMergeRequestRef[]> {
     const refs = new Map<string, GitLabMergeRequestRef>();
 
@@ -343,6 +464,11 @@ export class GitLabClient {
     return [...refs.values()];
   }
 
+  /**
+   * Resolves and caches project ID from a project path.
+   * @param projectPath Full GitLab project path.
+   * @returns Numeric GitLab project ID.
+   */
   private async projectIdFromPath(projectPath: string): Promise<number> {
     if (this.projectPathToId.has(projectPath)) {
       return this.projectPathToId.get(projectPath)!;
@@ -353,6 +479,12 @@ export class GitLabClient {
     return project.id;
   }
 
+  /**
+   * Executes a REST request and parses JSON response payload.
+   * @param path API path relative to base URL.
+   * @param params Optional query parameters.
+   * @returns Parsed JSON payload.
+   */
   private async requestJson<T>(path: string, params?: Record<string, string | number | boolean>): Promise<T> {
     const query = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}` : "";
     this.logger.log(`REST ${path}${query}`);
@@ -369,6 +501,12 @@ export class GitLabClient {
     return payload;
   }
 
+  /**
+   * Executes a GraphQL request and validates response structure.
+   * @param query GraphQL query string.
+   * @param variables Query variables object.
+   * @returns Parsed GraphQL data payload.
+   */
   private async graphQlRequest<T>(query: string, variables: Record<string, unknown>): Promise<T> {
     this.logger.log("GraphQL request");
     this.logger.logPayload("GraphQL request payload", { query, variables });
@@ -398,6 +536,12 @@ export class GitLabClient {
     return payload.data;
   }
 
+  /**
+   * Executes paginated REST retrieval and accumulates response pages.
+   * @param path API path relative to base URL.
+   * @param params Optional query parameters.
+   * @returns Array of response pages.
+   */
   private async paginatedGet<T extends unknown[]>(path: string, params?: Record<string, string>): Promise<T[]> {
     const out: T[] = [];
     let page = 1;
@@ -421,6 +565,12 @@ export class GitLabClient {
     return out;
   }
 
+  /**
+   * Returns fallback value when request execution fails.
+   * @param fn Request function to execute.
+   * @param fallback Fallback value when execution fails.
+   * @returns Successful result or fallback value.
+   */
   private async safeRequest<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
     try {
       return await fn();
@@ -429,6 +579,10 @@ export class GitLabClient {
     }
   }
 
+  /**
+   * Returns authenticated request headers for GitLab API calls.
+   * @returns Headers containing API authentication.
+   */
   private get headers(): HeadersInit {
     return {
       "PRIVATE-TOKEN": this.token,
