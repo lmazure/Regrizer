@@ -94,7 +94,12 @@ export function parseUnifiedDiffHunks(diff: string): ParsedDiffHunk[] {
   let seenModification = false;
   let trailingContextCandidate: ParsedDiffLine[] = [];
 
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line.length === 0 && index === lines.length - 1) {
+      continue;
+    }
+
     if (line.startsWith("@@")) {
       if (current) {
         hunks.push(current);

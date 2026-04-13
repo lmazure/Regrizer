@@ -694,7 +694,7 @@ export function renderHtmlReports(
       details > summary .chunk-title { display: inline; margin: 0; }
       details > summary + * { margin-top: 8px; }
       .code-table { width: max-content; min-width: 100%; border-collapse: collapse; margin-bottom: 6px; table-layout: auto; }
-      .code-table td, .code-table th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; white-space: nowrap; }
+      .code-table td, .code-table th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; white-space: nowrap; line-height: 1.4; }
       .ln { width: 70px; color: var(--muted); text-align: right; }
       .code-table th:nth-child(2), .code-table td:nth-child(2) { min-width: 520px; }
       .code-table th:nth-child(3), .code-table td:nth-child(3) { min-width: 520px; }
@@ -707,6 +707,7 @@ export function renderHtmlReports(
       tr.row-context td { background: var(--context); }
       tr.row-separator td { background: #eef2f7; text-align: center; font-weight: 600; color: var(--muted); }
       .code-table td.provenance { background: var(--card); }
+      .code-table td > code { display: inline-block; min-height: 1em; }
       code { white-space: pre; word-break: normal; font-family: "Consolas", "Courier New", monospace; }
       .unresolved { color: var(--warn); }
       a { color: #0a58ca; text-decoration: none; }

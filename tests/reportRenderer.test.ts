@@ -234,4 +234,36 @@ describe("renderHtmlReport", () => {
     expect((html.match(/Generated at /g) ?? []).length).toBe(1);
     expect(html).toContain(`Generated at ${first.generatedAt}`);
   });
+
+  it("keeps empty code cells at consistent height via code-table CSS", () => {
+    const result = buildResult([
+      {
+        filePath: "src/deleted.ts",
+        oldPath: "src/deleted.ts",
+        isTestFile: false,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 0,
+            newCount: 0,
+            rows: [
+              {
+                lineNumber: null,
+                afterText: "",
+                beforeText: "removed-line",
+                rowKind: "removed",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+
+    expect(html).toContain(".code-table td > code { display: inline-block; min-height: 1em; }");
+    expect(html).toContain('<tr class="row-removed">');
+    expect(html).toContain("<td><code></code></td><td><code>removed-line</code></td>");
+  });
 });

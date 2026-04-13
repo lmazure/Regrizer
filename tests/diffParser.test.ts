@@ -23,6 +23,26 @@ describe("extractChangedNewLineNumbers", () => {
 });
 
 describe("parseUnifiedDiffHunks", () => {
+  it("ignores synthetic trailing blank line for deleted-file hunks", () => {
+    const diff = [
+      "@@ -1,2 +0,0 @@",
+      "-first",
+      "-second",
+      "",
+    ].join("\n");
+
+    const hunks = parseUnifiedDiffHunks(diff);
+    expect(hunks).toHaveLength(1);
+
+    const [hunk] = hunks;
+    expect(hunk.newStart).toBe(0);
+    expect(hunk.newCount).toBe(0);
+    expect(hunk.entries.map((entry) => `${entry.kind}:${entry.newLineNumber ?? "null"}:${entry.text}`)).toEqual([
+      "removed:null:first",
+      "removed:null:second",
+    ]);
+  });
+
   it("keeps unchanged boundary lines in hunk context, not in modified lines", () => {
     const diff = [
       "@@ -10,5 +10,6 @@",

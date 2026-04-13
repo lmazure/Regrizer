@@ -205,6 +205,7 @@ Local parsing with unified hunk headers, producing:
 - old-side removed lines (`-`) and new-side added lines (`+`)
 - leading/trailing unchanged hunk context lines (space-prefixed in unified diff)
 - ordered hunk entries so unchanged lines between change groups are preserved as context
+- synthetic trailing blank lines from diff text are ignored, preventing bogus `line 0` context rows in deleted-file hunks
 
 ### 9) Fetch file contents for context windows
 
