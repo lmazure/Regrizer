@@ -40,6 +40,19 @@ export function parseIssueUrlsFromFileContent(content: string): string[] {
 }
 
 /**
+ * Splits raw text into lines while dropping one synthetic trailing blank line.
+ * @param content Raw text content.
+ * @returns Normalized text lines.
+ */
+export function splitTextLines(content: string): string[] {
+  const lines = content.split(/\r?\n/);
+  if (lines.length > 0 && lines[lines.length - 1] === "") {
+    return lines.slice(0, -1);
+  }
+  return lines;
+}
+
+/**
  * Loads issue URLs from a text file.
  * @param filePath Input file path.
  * @returns Parsed issue URLs.

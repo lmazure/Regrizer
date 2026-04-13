@@ -218,6 +218,8 @@ For each changed file:
 
 Used to render 3 lines before/after plus exact chunk lines in a single table per file. Unchanged rows only populate the first two columns; changed rows also carry before/provenance metadata.
 
+When splitting raw file contents into lines, Regrizer drops only the synthetic trailing empty element caused by terminal newlines, so created/deleted file views do not show a ghost final context row.
+
 ### 10) Attribute previous commit per old-side line
 
 For each removed line with a valid old line number:

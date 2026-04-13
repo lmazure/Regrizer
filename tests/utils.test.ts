@@ -7,6 +7,7 @@ import {
   loadIssueUrlsFromFile,
   parseGitLabIssueUrl,
   parseIssueUrlsFromFileContent,
+  splitTextLines,
 } from "../src/utils.js";
 
 describe("parseGitLabIssueUrl", () => {
@@ -75,5 +76,15 @@ describe("chunkSortedNumbers", () => {
       { start: 8, end: 14, changed: [10, 12] },
       { start: 28, end: 32, changed: [30] },
     ]);
+  });
+});
+
+describe("splitTextLines", () => {
+  it("drops one synthetic trailing blank line from terminal newline", () => {
+    expect(splitTextLines("a\nb\n")).toEqual(["a", "b"]);
+  });
+
+  it("preserves intentional final blank line content", () => {
+    expect(splitTextLines("a\n\n")).toEqual(["a", ""]);
   });
 });

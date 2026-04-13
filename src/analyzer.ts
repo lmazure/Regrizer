@@ -16,6 +16,7 @@ import {
   ReportLine,
   ReportMergeRequest,
 } from "./types.js";
+import { splitTextLines } from "./utils.js";
 
 /**
  * Resolved provenance context attached to a previously introduced commit.
@@ -497,7 +498,7 @@ export class IssueAnalyzer {
   private async safeReadFileLines(projectId: number, filePath: string, ref: string): Promise<string[] | null> {
     try {
       const raw = await this.client.getFileRaw(projectId, filePath, ref);
-      return raw.split(/\r?\n/);
+      return splitTextLines(raw);
     } catch {
       return null;
     }
