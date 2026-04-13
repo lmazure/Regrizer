@@ -4,6 +4,7 @@
 This file provides guidance for AI/code agents working in this repository.
 
 ## Canonical documentation
+- Always read `README.md` before doing any work in this repository.
 - `README.md` is the canonical source for product behavior, architecture, CLI usage, and API flow.
 - Do not duplicate README content here; this file should only contain agent workflow constraints.
 - For report/CLI invariants, follow README and keep behavior aligned with it.

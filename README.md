@@ -17,16 +17,17 @@ npm install
 
 ```bash
 npm run build
-node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123"
 ```
+
+The `--output` flag specifies the output file path for the HTML report. It defaults to `report.html` if not provided.
 
 Classify files as test vs production in the HTML report with `--test-file-glob` (comma-separated list of globs). Any file whose path matches one of the globs is marked as test:
 
 ```bash
 node dist/src/cli.js \
   --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
-  --test-file-glob "**/*.test.ts,**/__tests__/**" \
-  --output report.html
+  --test-file-glob "**/*.test.ts,**/__tests__/**"
 ```
 
 You can provide `--issue-url` multiple times to analyze several issues in one run and include all of them in a single output HTML report:
@@ -34,14 +35,13 @@ You can provide `--issue-url` multiple times to analyze several issues in one ru
 ```bash
 node dist/src/cli.js \
   --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
-  --issue-url "https://gitlab.example.com/group/project/-/issues/456" \
-  --output report.html
+  --issue-url "https://gitlab.example.com/group/project/-/issues/456"
 ```
 
 You can also provide issue URLs from a file with `--issue-url-file` (one issue URL per line; blank lines are ignored):
 
 ```bash
-node dist/src/cli.js --issue-url-file ./issues.txt --output report.html
+node dist/src/cli.js --issue-url-file ./issues.txt
 ```
 
 You can combine repeated `--issue-url`, positional URLs, and one or more `--issue-url-file` flags:
@@ -50,14 +50,13 @@ You can combine repeated `--issue-url`, positional URLs, and one or more `--issu
 node dist/src/cli.js \
   --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
   --issue-url-file ./issues-team-a.txt \
-  --issue-url-file ./issues-team-b.txt \
-  --output report.html
+  --issue-url-file ./issues-team-b.txt
 ```
 
 Additional issue URLs can also be passed positionally after the first `--issue-url` value:
 
 ```bash
-node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" "https://gitlab.example.com/group/project/-/issues/456" --output report.html
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" "https://gitlab.example.com/group/project/-/issues/456"
 ```
 
 The generated `--output` file will contain one section per input issue.
@@ -67,19 +66,19 @@ If one issue fails (for example, 404 not found), Regrizer continues analyzing th
 Add `--verbose` to print progress logs in the terminal:
 
 ```bash
-node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html --verbose
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --verbose
 ```
 
 Repeat the flag (`--verbose --verbose`) to also print payload-only REST and GraphQL request/response logs:
 
 ```bash
-node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html --verbose --verbose
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --verbose --verbose
 ```
 
 Or run directly in dev mode:
 
 ```bash
-npm run dev -- --issue-url "https://gitlab.example.com/group/project/-/issues/123" --output report.html
+npm run dev -- --issue-url "https://gitlab.example.com/group/project/-/issues/123"
 ```
 
 ### Notes

@@ -33,6 +33,7 @@ function parseArgs(argv: string[]): CliArgs {
   const issueUrls: string[] = [];
   const issueUrlFiles: string[] = [];
   let verboseLevel = 0;
+  const knownFlags = new Set(["issue-url", "issue-url-file", "output", "test-file-glob"]);
 
   for (let index = 2; index < argv.length; index += 1) {
     const value = argv[index];
@@ -47,6 +48,10 @@ function parseArgs(argv: string[]): CliArgs {
     }
 
     const key = value.slice(2);
+    if (!knownFlags.has(key)) {
+      throw new Error(`Unknown flag: --${key}`);
+    }
+
     const next = argv[index + 1];
     if (!next || next.startsWith("--")) {
       throw new Error(`Missing value for --${key}`);
