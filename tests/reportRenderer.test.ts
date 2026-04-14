@@ -32,6 +32,8 @@ function buildResult(files: ReportCommitFile[]): AnalysisResult {
       {
         mr: {
           projectId: 1,
+          projectPathWithNamespace: "group/project",
+          projectWebUrl: "https://gitlab.example.com/group/project",
           iid: 99,
           title: "MR title",
           webUrl: "https://gitlab.example.com/group/project/-/merge_requests/99",
@@ -119,6 +121,7 @@ describe("renderHtmlReport", () => {
     expect((html.match(/<table class="code-table">/g) ?? []).length).toBe(2);
     expect((html.match(/<tr class="row-separator">/g) ?? []).length).toBe(1);
     expect((html.match(/>…</g) ?? []).length).toBeGreaterThanOrEqual(6);
+    expect(html).toContain('<div class="meta"><span class="label">Project</span> <a href="https://gitlab.example.com/group/project" target="_blank" rel="noopener">group/project</a></div>');
     expect(html).toContain("Committed 2026-03-30T00:00:00.000Z · Committer: Ada Lovelace &lt;ada@example.com&gt;");
     expect(html).toContain("Merged 2026-03-30T00:00:00.000Z · Author: Grace Hopper · Assignees: Linus Torvalds, Margaret Hamilton · Reviewers: Barbara Liskov");
   });

@@ -551,6 +551,10 @@ function renderMergeRequest(section: ReportMergeRequest): string {
   const commits = section.commits
     .map((commit) => renderCommit(commit))
     .join("\n");
+  const projectLabel = section.mr.projectPathWithNamespace ?? String(section.mr.projectId);
+  const projectHtml = section.mr.projectWebUrl
+    ? `<a href="${escapeHtml(section.mr.projectWebUrl)}" target="_blank" rel="noopener">${escapeHtml(projectLabel)}</a>`
+    : escapeHtml(projectLabel);
   const mergedAt = section.mergedAt ?? "unknown";
   const author = section.mr.authorName ?? "unknown";
   const assignees = section.mr.assignees && section.mr.assignees.length > 0
@@ -564,6 +568,7 @@ function renderMergeRequest(section: ReportMergeRequest): string {
   return `
     <details class="mr" open>
       <summary><h3><a href="${escapeHtml(section.mr.webUrl ?? "")}" target="_blank" rel="noopener">!${section.mr.iid}</a> ${escapeHtml(section.mr.title ?? "")}</h3></summary>
+      <div class="meta"><span class="label">Project</span> ${projectHtml}</div>
       <div class="meta">${escapeHtml(mrMetaLine)}</div>
       ${commits || '<div class="meta">No commits found for this MR.</div>'}
     </details>

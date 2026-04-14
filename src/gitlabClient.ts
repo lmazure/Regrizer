@@ -84,6 +84,17 @@ export class GitLabClient {
   }
 
   /**
+   * Retrieves project metadata by numeric project ID.
+   * @param projectId GitLab project ID.
+   * @returns Project metadata payload.
+   */
+  async getProjectById(projectId: number): Promise<GitLabProject> {
+    const project = await this.requestJson<GitLabProject>(`/projects/${projectId}`);
+    this.projectPathToId.set(project.path_with_namespace, project.id);
+    return project;
+  }
+
+  /**
    * Retrieves a project issue by project ID and issue IID.
    * @param projectId GitLab project ID.
    * @param issueIid Issue IID in project.

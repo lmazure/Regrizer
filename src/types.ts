@@ -36,6 +36,8 @@ export interface GitLabIssue {
  */
 export interface GitLabMergeRequestRef {
   projectId: number;
+  projectPathWithNamespace?: string;
+  projectWebUrl?: string;
   iid: number;
   title?: string;
   webUrl?: string;

@@ -33,6 +33,7 @@ interface PreviousCommitContext {
 export class IssueAnalyzer {
   private readonly blameCache = new Map<string, string | null>();
   private readonly previousCommitContextCache = new Map<string, PreviousCommitContext | null>();
+  private readonly projectDisplayCache = new Map<number, { pathWithNamespace: string; webUrl: string } | null>();
 
   /**
    * Creates an issue analyzer backed by the GitLab client.
@@ -61,9 +62,12 @@ export class IssueAnalyzer {
     for (const mr of mergedMrrs) {
       this.logger.log(`Analyzing MR !${mr.iid} (${mr.project_id})`);
       const commits = await this.analyzeMergeRequestCommits(mr);
+      const mrProject = await this.resolveProjectDisplay(mr.project_id);
       mergeRequests.push({
         mr: {
           projectId: mr.project_id,
+          projectPathWithNamespace: mrProject?.pathWithNamespace ?? String(mr.project_id),
+          projectWebUrl: mrProject?.webUrl ?? undefined,
           iid: mr.iid,
           title: mr.title,
           webUrl: mr.web_url,
@@ -514,6 +518,30 @@ export class IssueAnalyzer {
     try {
       return await this.client.getCommit(projectId, sha);
     } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Resolves and caches display metadata for a project ID.
+   * @param projectId GitLab project ID.
+   * @returns Project path and URL or null when unavailable.
+   */
+  private async resolveProjectDisplay(projectId: number): Promise<{ pathWithNamespace: string; webUrl: string } | null> {
+    if (this.projectDisplayCache.has(projectId)) {
+      return this.projectDisplayCache.get(projectId)!;
+    }
+
+    try {
+      const project = await this.client.getProjectById(projectId);
+      const display = {
+        pathWithNamespace: project.path_with_namespace,
+        webUrl: project.web_url,
+      };
+      this.projectDisplayCache.set(projectId, display);
+      return display;
+    } catch {
+      this.projectDisplayCache.set(projectId, null);
       return null;
     }
   }
