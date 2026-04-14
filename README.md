@@ -22,6 +22,14 @@ node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/iss
 
 The `--output` flag specifies the output file path for the HTML report. It defaults to `report.html` if not provided.
 
+Use `--display` to open the generated report automatically in the system default browser after generation:
+
+```bash
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --display
+```
+
+If the browser open step fails, the command exits with an error.
+
 Classify files as test vs production in the HTML report with `--test-file-glob` (comma-separated list of globs). Any file whose path matches one of the globs is marked as test:
 
 ```bash
@@ -89,6 +97,7 @@ npm run dev -- --issue-url "https://gitlab.example.com/group/project/-/issues/12
 - `--issue-url` can be repeated to process several issues in one execution.
 - `--issue-url-file <file>` loads issue URLs from a file (one URL per non-empty line).
 - `--test-file-glob "glob1,glob2"` marks matching files as test code in the HTML report.
+- `--display` opens the generated HTML report in the default browser and fails if opening is not possible.
 - Binary/unavailable diffs are included with a skip reason.
 - If blame cannot resolve a previous commit for a line, the report marks it as unresolved.
 

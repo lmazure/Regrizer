@@ -1,4 +1,7 @@
 import { writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { IssueAnalyzer } from "./analyzer.js";
 import { GitLabClient } from "./gitlabClient.js";
 import { Logger } from "./logger.js";
@@ -11,6 +14,7 @@ import { loadIssueUrlsFromFile, parseGitLabIssueUrl } from "./utils.js";
 interface CliArgs {
   issueUrls: string[];
   output: string;
+  display: boolean;
   verboseLevel: number;
   testFileGlob: string[];
 }
@@ -33,6 +37,7 @@ function parseArgs(argv: string[]): CliArgs {
   const issueUrls: string[] = [];
   const issueUrlFiles: string[] = [];
   let verboseLevel = 0;
+  let display = false;
   const knownFlags = new Set(["issue-url", "issue-url-file", "output", "test-file-glob"]);
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -44,6 +49,11 @@ function parseArgs(argv: string[]): CliArgs {
 
     if (value === "--verbose") {
       verboseLevel += 1;
+      continue;
+    }
+
+    if (value === "--display") {
+      display = true;
       continue;
     }
 
@@ -78,6 +88,7 @@ function parseArgs(argv: string[]): CliArgs {
   return {
     issueUrls,
     output: args.get("output") ?? "report.html",
+    display,
     verboseLevel,
     testFileGlob: (args.get("test-file-glob") ?? "")
       .split(",")
@@ -87,11 +98,43 @@ function parseArgs(argv: string[]): CliArgs {
 }
 
 /**
+ * Opens a local file in the default browser for the current operating system.
+ * @param filePath Output report path.
+ * @returns Promise that resolves when the opener command exits successfully.
+ */
+async function openReportInBrowser(filePath: string): Promise<void> {
+  const absolutePath = resolve(filePath);
+  const targetUrl = pathToFileURL(absolutePath).href;
+
+  const opener = process.platform === "win32"
+    ? { command: process.env.ComSpec ?? "cmd", args: ["/c", "start", "", targetUrl] }
+    : process.platform === "darwin"
+      ? { command: "open", args: [targetUrl] }
+      : { command: "xdg-open", args: [targetUrl] };
+
+  await new Promise<void>((resolvePromise, rejectPromise) => {
+    const child = spawn(opener.command, opener.args, { stdio: "ignore" });
+
+    child.on("error", (error) => {
+      rejectPromise(new Error(`Failed to open report in browser (${opener.command}): ${error.message}`));
+    });
+
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolvePromise();
+        return;
+      }
+      rejectPromise(new Error(`Failed to open report in browser (${opener.command} exited with code ${String(code)})`));
+    });
+  });
+}
+
+/**
  * Executes issue analysis and writes the HTML report.
  * @returns Promise that resolves when the report is written.
  */
 async function run(): Promise<void> {
-  const { issueUrls, output, verboseLevel, testFileGlob } = parseArgs(process.argv);
+  const { issueUrls, output, display, verboseLevel, testFileGlob } = parseArgs(process.argv);
   const token = process.env.GITLAB_TOKEN;
   if (!token) {
     throw new Error("GITLAB_TOKEN environment variable is required");
@@ -126,13 +169,17 @@ async function run(): Promise<void> {
   const html = renderHtmlReports(results, failedIssues, { testFileGlob });
   await writeFile(output, html, "utf-8");
   logger.log(`HTML report written to ${output}`);
+  if (display) {
+    await openReportInBrowser(output);
+    logger.log(`Opened report in browser: ${output}`);
+  }
   process.stdout.write(`Report generated: ${output}\n`);
 }
 
 run().catch((error) => {
   process.stderr.write(`Error: ${(error as Error).message}\n`);
   process.stderr.write(
-    "Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--issue-url-file <file> ...] [--output report.html] [--test-file-glob \"glob1,glob2\"] [--verbose] [--verbose]\n",
+    "Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--issue-url-file <file> ...] [--output report.html] [--display] [--test-file-glob \"glob1,glob2\"] [--verbose] [--verbose]\n",
   );
   process.exitCode = 1;
 });
