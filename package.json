@@ -13,7 +13,9 @@
   "engines": {
     "node": ">=20"
   },
-  "dependencies": {},
+  "dependencies": {
+    "yaml": "^2.8.3"
+  },
   "devDependencies": {
     "@types/node": "^24.5.2",
     "tsx": "^4.20.5",
