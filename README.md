@@ -116,8 +116,10 @@ The report hierarchy is:
      - merge request
      - related issues
    - previous commit / merge request / related issues cells are vertically merged when consecutive rows have the same value
+   - when a row's related issues include the currently analyzed issue, those three provenance cells are rendered with reduced emphasis
    - unchanged rows fill only line number + code-after columns
    - changed rows fill before/provenance columns when applicable
 7. Every hierarchy level (MR, commit, file) is collapsible and expanded by default when the report opens
 8. Each commit section shows one compact metadata line with commit timestamp and committer identity (`Name <email>`) when available
 9. Each merge request section shows a `Project` line (from the MR's own project, which may differ from the input issue project) plus merged timestamp, author, assignees, and reviewers metadata
+10. In the overview table, "Issue of origin" columns exclude the currently analyzed issue (other origin issues remain visible)

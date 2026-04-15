@@ -123,11 +123,15 @@ Rows with old-side (`-`) lines include:
 - merge request hyperlink (if found)
 - related issue hyperlinks (if found)
 
+When related issues on a row include the currently analyzed issue, the renderer marks all three provenance columns for that row group (previous commit, merge request, related issues) with reduced visual emphasis.
+
 ### 11) Render HTML report
 
 No API call in this step.
 
 The renderer outputs nested `details/summary` sections for issue -> MR -> commit -> file (all `open` by default), with one color-coded unified table per file (`context`, `paired`, `added`, `removed` rows).
+
+In the overview table, origin-issue cells exclude the currently analyzed issue while retaining any other related origin issues.
 
 Each commit header includes one compact line with `Committed ... · Committer: ...` metadata.
 

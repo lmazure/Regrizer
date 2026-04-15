@@ -2,6 +2,14 @@ import { AnalysisResult, ReportChunk, ReportCommit, ReportCommitFile, ReportMerg
 import { matchesAnyGlob } from "./globMatcher.js";
 import { escapeHtml } from "./utils.js";
 
+function normalizeIssueUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "").toLowerCase();
+}
+
+function isSameIssueUrl(left: string, right: string): boolean {
+  return normalizeIssueUrl(left) === normalizeIssueUrl(right);
+}
+
 /**
  * Failed issue item rendered in the final HTML output.
  */
@@ -15,7 +23,7 @@ interface FailedIssueRenderItem {
  * @param file Report commit file.
  * @returns Unique related issue references.
  */
-function collectFileRelatedIssues(file: ReportCommitFile): Array<{ webUrl: string; title: string }> {
+function collectFileRelatedIssues(file: ReportCommitFile, currentIssueUrl: string): Array<{ webUrl: string; title: string }> {
   const refs = new Map<string, { webUrl: string; title: string }>();
   for (const chunk of file.chunks) {
     for (const row of chunk.rows) {
@@ -23,6 +31,9 @@ function collectFileRelatedIssues(file: ReportCommitFile): Array<{ webUrl: strin
         continue;
       }
       for (const issue of row.previousMergeRequestIssues ?? []) {
+        if (isSameIssueUrl(issue.webUrl, currentIssueUrl)) {
+          continue;
+        }
         if (!refs.has(issue.webUrl)) {
           refs.set(issue.webUrl, { webUrl: issue.webUrl, title: issue.title });
         }
@@ -56,6 +67,7 @@ function expandFilesForOverview(
   issueKey: string,
   mrKey: string,
   files: ReportCommitFile[],
+  currentIssueUrl: string,
 ): Array<{ fileKey: string; fileHtml: string; issueHtml: string }> {
   const expanded: Array<{ fileKey: string; fileHtml: string; issueHtml: string }> = [];
 
@@ -67,7 +79,7 @@ function expandFilesForOverview(
   }
 
   for (const file of uniqueFiles.values()) {
-    const issues = collectFileRelatedIssues(file);
+    const issues = collectFileRelatedIssues(file, currentIssueUrl);
     const fileHtml = `<code>${escapeHtml(file.filePath)}</code>`;
 
     if (issues.length === 0) {
@@ -108,8 +120,8 @@ function renderOverviewTable(results: AnalysisResult[]): string {
       const mrHtml = `<a href="${escapeHtml(mrSection.mr.webUrl ?? "")}" target="_blank" rel="noopener">!${escapeHtml(String(mrSection.mr.iid))}</a> ${escapeHtml(mrSection.mr.title ?? "")}`;
 
       const allFiles = mrSection.commits.flatMap((commit) => commit.files);
-      const productionExpanded = expandFilesForOverview(issueKey, mrKey, allFiles.filter((file) => !file.isTestFile));
-      const testExpanded = expandFilesForOverview(issueKey, mrKey, allFiles.filter((file) => file.isTestFile));
+      const productionExpanded = expandFilesForOverview(issueKey, mrKey, allFiles.filter((file) => !file.isTestFile), result.inputIssue.web_url);
+      const testExpanded = expandFilesForOverview(issueKey, mrKey, allFiles.filter((file) => file.isTestFile), result.inputIssue.web_url);
 
       const rowCount = Math.max(1, productionExpanded.length, testExpanded.length);
       for (let index = 0; index < rowCount; index += 1) {
@@ -218,6 +230,11 @@ interface ChunkBlock {
 type CommitTableRow =
   | { kind: "data"; row: ReportChunk["rows"][number] }
   | { kind: "separator" };
+
+interface ProvenanceCellValue {
+  html: string;
+  dimmed: boolean;
+}
 
 /**
  * Expanded row model used to render overview table row spans.
@@ -386,18 +403,35 @@ function buildFileTableRows(file: ReportCommitFile): CommitTableRow[] {
  * @param rows Commit table row models.
  * @returns HTML table rows.
  */
-function renderCommitTableRows(rows: CommitTableRow[]): string {
+function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string): string {
+  const includesCurrentIssue = (item: CommitTableRow): boolean => {
+    if (item.kind === "separator") {
+      return false;
+    }
+    return (item.row.previousMergeRequestIssues ?? []).some((issue) => isSameIssueUrl(issue.webUrl, currentIssueUrl));
+  };
+
+  const areEqual = (left: ProvenanceCellValue | null, right: ProvenanceCellValue | null): boolean => {
+    if (left === null || right === null) {
+      return left === right;
+    }
+    return left.html === right.html && left.dimmed === right.dimmed;
+  };
+
   const commitValues = rows.map((item) => {
     if (item.kind === "separator") {
       return null;
     }
 
     const row = item.row;
-    return row.previousCommitSha
+    return {
+      html: row.previousCommitSha
     ? (row.previousCommitWebUrl
       ? `<a href="${escapeHtml(row.previousCommitWebUrl)}" target="_blank" rel="noopener"><code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code></a>`
       : `<code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code>`)
-    : (row.unresolvedReason ? `<span class="unresolved">${escapeHtml(row.unresolvedReason)}</span>` : "");
+    : (row.unresolvedReason ? `<span class="unresolved">${escapeHtml(row.unresolvedReason)}</span>` : ""),
+      dimmed: includesCurrentIssue(item),
+    } satisfies ProvenanceCellValue;
   });
 
   const mrValues = rows.map((item) => {
@@ -406,9 +440,12 @@ function renderCommitTableRows(rows: CommitTableRow[]): string {
     }
 
     const row = item.row;
-    return row.previousMergeRequest
+    return {
+      html: row.previousMergeRequest
     ? `<a href="${escapeHtml(row.previousMergeRequest.webUrl ?? "")}" target="_blank" rel="noopener">!${row.previousMergeRequest.iid}</a>`
-    : "";
+    : "",
+      dimmed: includesCurrentIssue(item),
+    } satisfies ProvenanceCellValue;
   });
 
   const issuesValues = rows.map((item) => {
@@ -417,21 +454,24 @@ function renderCommitTableRows(rows: CommitTableRow[]): string {
     }
 
     const row = item.row;
-    return (row.previousMergeRequestIssues && row.previousMergeRequestIssues.length > 0)
+    return {
+      html: (row.previousMergeRequestIssues && row.previousMergeRequestIssues.length > 0)
     ? row.previousMergeRequestIssues
       .map((issue) => `<a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a>`)
       .join("<br />")
-    : "";
+    : "",
+      dimmed: includesCurrentIssue(item),
+    } satisfies ProvenanceCellValue;
   });
 
-  const getRowSpan = (values: Array<string | null>, startIndex: number): number => {
+  const getRowSpan = (values: Array<ProvenanceCellValue | null>, startIndex: number): number => {
     const current = values[startIndex];
     if (current === null) {
       return 1;
     }
 
     let span = 1;
-    while (startIndex + span < values.length && values[startIndex + span] !== null && values[startIndex + span] === current) {
+    while (startIndex + span < values.length && values[startIndex + span] !== null && areEqual(values[startIndex + span], current)) {
       span += 1;
     }
     return span;
@@ -444,14 +484,17 @@ function renderCommitTableRows(rows: CommitTableRow[]): string {
       }
 
       const row = item.row;
-      const commitCell = index === 0 || commitValues[index] === null || commitValues[index] !== commitValues[index - 1]
-        ? `<td class="provenance provenance-commit" rowspan="${getRowSpan(commitValues, index)}">${commitValues[index]}</td>`
+      const commitValue = commitValues[index];
+      const mrValue = mrValues[index];
+      const issuesValue = issuesValues[index];
+      const commitCell = index === 0 || commitValue === null || !areEqual(commitValue, commitValues[index - 1])
+        ? `<td class="provenance provenance-commit${commitValue?.dimmed ? " provenance-dimmed" : ""}" rowspan="${getRowSpan(commitValues, index)}">${commitValue?.html ?? ""}</td>`
         : "";
-      const mrCell = index === 0 || mrValues[index] === null || mrValues[index] !== mrValues[index - 1]
-        ? `<td class="provenance provenance-mr" rowspan="${getRowSpan(mrValues, index)}">${mrValues[index]}</td>`
+      const mrCell = index === 0 || mrValue === null || !areEqual(mrValue, mrValues[index - 1])
+        ? `<td class="provenance provenance-mr${mrValue?.dimmed ? " provenance-dimmed" : ""}" rowspan="${getRowSpan(mrValues, index)}">${mrValue?.html ?? ""}</td>`
         : "";
-      const issuesCell = index === 0 || issuesValues[index] === null || issuesValues[index] !== issuesValues[index - 1]
-        ? `<td class="provenance provenance-issues" rowspan="${getRowSpan(issuesValues, index)}">${issuesValues[index]}</td>`
+      const issuesCell = index === 0 || issuesValue === null || !areEqual(issuesValue, issuesValues[index - 1])
+        ? `<td class="provenance provenance-issues${issuesValue?.dimmed ? " provenance-dimmed" : ""}" rowspan="${getRowSpan(issuesValues, index)}">${issuesValue?.html ?? ""}</td>`
         : "";
 
       return `<tr class="row-${row.rowKind}"><td class="ln">${row.lineNumber ?? ""}</td><td><code>${escapeHtml(row.afterText)}</code></td><td><code>${escapeHtml(row.beforeText ?? "")}</code></td>${commitCell}${mrCell}${issuesCell}</tr>`;
@@ -464,8 +507,8 @@ function renderCommitTableRows(rows: CommitTableRow[]): string {
  * @param file Report commit file.
  * @returns HTML file table.
  */
-function renderFileTable(file: ReportCommitFile): string {
-  const rows = renderCommitTableRows(buildFileTableRows(file));
+function renderFileTable(file: ReportCommitFile, currentIssueUrl: string): string {
+  const rows = renderCommitTableRows(buildFileTableRows(file), currentIssueUrl);
 
   return `
     <table class="code-table">
@@ -496,7 +539,7 @@ function renderFailedIssueSection(item: FailedIssueRenderItem, index: number): s
  * @param file Report commit file.
  * @returns HTML file details block.
  */
-function renderFile(file: ReportCommitFile): string {
+function renderFile(file: ReportCommitFile, currentIssueUrl: string): string {
   const kindEmoji = file.isTestFile ? "🧪" : "🏭";
   const fileTitle = `${kindEmoji} ${file.filePath}`;
   if (file.skippedReason) {
@@ -508,7 +551,7 @@ function renderFile(file: ReportCommitFile): string {
     `;
   }
 
-  const table = renderFileTable(file);
+  const table = renderFileTable(file, currentIssueUrl);
 
   return `
     <details class="file" open>
@@ -524,9 +567,9 @@ function renderFile(file: ReportCommitFile): string {
  * @param commit Report commit.
  * @returns HTML commit details block.
  */
-function renderCommit(commit: ReportCommit): string {
+function renderCommit(commit: ReportCommit, currentIssueUrl: string): string {
   const files = commit.files
-    .map((file) => renderFile(file))
+    .map((file) => renderFile(file, currentIssueUrl))
     .join("\n");
   const committerText = commit.committerName && commit.committerEmail
     ? `${commit.committerName} <${commit.committerEmail}>`
@@ -547,9 +590,9 @@ function renderCommit(commit: ReportCommit): string {
  * @param section Report merge request section.
  * @returns HTML merge request details block.
  */
-function renderMergeRequest(section: ReportMergeRequest): string {
+function renderMergeRequest(section: ReportMergeRequest, currentIssueUrl: string): string {
   const commits = section.commits
-    .map((commit) => renderCommit(commit))
+    .map((commit) => renderCommit(commit, currentIssueUrl))
     .join("\n");
   const projectLabel = section.mr.projectPathWithNamespace ?? String(section.mr.projectId);
   const projectHtml = section.mr.projectWebUrl
@@ -583,7 +626,7 @@ function renderMergeRequest(section: ReportMergeRequest): string {
  */
 function renderIssueSection(result: AnalysisResult, index: number): string {
   const mrSections = result.mergeRequests
-    .map((section) => renderMergeRequest(section))
+    .map((section) => renderMergeRequest(section, result.inputIssue.web_url))
     .join("\n");
 
   return `
@@ -712,6 +755,8 @@ export function renderHtmlReports(
       tr.row-context td { background: var(--context); }
       tr.row-separator td { background: #eef2f7; text-align: center; font-weight: 600; color: var(--muted); }
       .code-table td.provenance { background: var(--card); }
+      .code-table td.provenance.provenance-dimmed { color: var(--muted); opacity: 0.75; }
+      .code-table td.provenance.provenance-dimmed a { color: inherit; }
       .code-table td > code { display: inline-block; min-height: 1em; }
       code { white-space: pre; word-break: normal; font-family: "Consolas", "Courier New", monospace; }
       .unresolved { color: var(--warn); }

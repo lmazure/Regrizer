@@ -227,6 +227,95 @@ describe("renderHtmlReport", () => {
     expect(html).toMatch(/<tr class="row-separator">[\s\S]*<\/tr>\s*<\/tbody>/);
   });
 
+  it("filters the currently analyzed issue from overview origin-issue cells", () => {
+    const result = buildResult([
+      {
+        filePath: "src/origin.ts",
+        oldPath: "src/origin.ts",
+        isTestFile: false,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "line-after",
+                beforeText: "line-before",
+                previousCommitSha: "abababababab1111111111111111111111111111",
+                previousCommitWebUrl: "https://gitlab.example.com/group/project/-/commit/abababababab1111111111111111111111111111",
+                previousMergeRequestIssues: [
+                  {
+                    title: "CURRENT_ORIGIN_SHOULD_HIDE",
+                    webUrl: "https://gitlab.example.com/group/project/-/issues/10",
+                  },
+                  {
+                    title: "OTHER_ORIGIN_SHOULD_REMAIN",
+                    webUrl: "https://gitlab.example.com/group/project/-/issues/42",
+                  },
+                ],
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+    const overviewSection = html.match(/<section class="overview">[\s\S]*?<\/section>/)?.[0] ?? "";
+
+    expect(overviewSection).not.toContain("CURRENT_ORIGIN_SHOULD_HIDE");
+    expect(overviewSection).toContain("OTHER_ORIGIN_SHOULD_REMAIN");
+  });
+
+  it("dims all provenance cells when current issue is among related issues", () => {
+    const result = buildResult([
+      {
+        filePath: "src/provenance.ts",
+        oldPath: "src/provenance.ts",
+        isTestFile: false,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "line-after",
+                beforeText: "line-before",
+                previousCommitSha: "cdcdcdcdcdcd2222222222222222222222222222",
+                previousCommitWebUrl: "https://gitlab.example.com/group/project/-/commit/cdcdcdcdcdcd2222222222222222222222222222",
+                previousMergeRequest: {
+                  projectId: 1,
+                  iid: 77,
+                  webUrl: "https://gitlab.example.com/group/project/-/merge_requests/77",
+                },
+                previousMergeRequestIssues: [
+                  {
+                    title: "Current issue relation",
+                    webUrl: "https://gitlab.example.com/group/project/-/issues/10",
+                  },
+                ],
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+
+    expect(html).toContain('class="provenance provenance-commit provenance-dimmed"');
+    expect(html).toContain('class="provenance provenance-mr provenance-dimmed"');
+    expect(html).toContain('class="provenance provenance-issues provenance-dimmed"');
+  });
+
   it("renders generated timestamp once at report level", () => {
     const first = buildResult([]);
     const second = buildResult([]);
