@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { IssueAnalyzer } from "./analyzer.js";
+import { loadRegrizerConfig } from "./fileTypeConfig.js";
 import { GitLabClient } from "./gitlabClient.js";
 import { Logger } from "./logger.js";
 import { renderHtmlReports } from "./reportRenderer.js";
@@ -16,7 +17,6 @@ interface CliArgs {
   output: string;
   display: boolean;
   verboseLevel: number;
-  testFileGlob: string[];
 }
 
 /**
@@ -38,7 +38,7 @@ function parseArgs(argv: string[]): CliArgs {
   const issueUrlFiles: string[] = [];
   let verboseLevel = 0;
   let display = false;
-  const knownFlags = new Set(["issue-url", "issue-url-file", "output", "test-file-glob"]);
+  const knownFlags = new Set(["issue-url", "issue-url-file", "output"]);
 
   for (let index = 2; index < argv.length; index += 1) {
     const value = argv[index];
@@ -90,10 +90,6 @@ function parseArgs(argv: string[]): CliArgs {
     output: args.get("output") ?? "report.html",
     display,
     verboseLevel,
-    testFileGlob: (args.get("test-file-glob") ?? "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter((value) => value.length > 0),
   };
 }
 
@@ -134,11 +130,13 @@ async function openReportInBrowser(filePath: string): Promise<void> {
  * @returns Promise that resolves when the report is written.
  */
 async function run(): Promise<void> {
-  const { issueUrls, output, display, verboseLevel, testFileGlob } = parseArgs(process.argv);
+  const { issueUrls, output, display, verboseLevel } = parseArgs(process.argv);
   const token = process.env.GITLAB_TOKEN;
   if (!token) {
     throw new Error("GITLAB_TOKEN environment variable is required");
   }
+
+  const config = loadRegrizerConfig("regrizer.yaml");
 
   const logger = new Logger(verboseLevel);
   logger.log(`Starting analysis for ${issueUrls.length} issue(s)`);
@@ -166,7 +164,7 @@ async function run(): Promise<void> {
     throw new Error("All input issues failed to analyze");
   }
 
-  const html = renderHtmlReports(results, failedIssues, { testFileGlob });
+  const html = renderHtmlReports(results, failedIssues, { fileTypes: config.fileTypes });
   await writeFile(output, html, "utf-8");
   logger.log(`HTML report written to ${output}`);
   if (display) {
@@ -179,7 +177,7 @@ async function run(): Promise<void> {
 run().catch((error) => {
   process.stderr.write(`Error: ${(error as Error).message}\n`);
   process.stderr.write(
-    "Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--issue-url-file <file> ...] [--output report.html] [--display] [--test-file-glob \"glob1,glob2\"] [--verbose] [--verbose]\n",
+    "Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--issue-url-file <file> ...] [--output report.html] [--display] [--verbose] [--verbose]\n",
   );
   process.exitCode = 1;
 });

@@ -1,5 +1,5 @@
 import { AnalysisResult, ReportChunk, ReportCommit, ReportCommitFile, ReportMergeRequest } from "./types.js";
-import { matchesAnyGlob } from "./globMatcher.js";
+import { FileTypeConfig, resolveFileType } from "./fileTypeConfig.js";
 import { escapeHtml } from "./utils.js";
 
 function normalizeIssueUrl(url: string): string {
@@ -19,11 +19,12 @@ interface FailedIssueRenderItem {
 }
 
 /**
- * Collects unique related issues referenced by changed rows in a file.
+ * Collects unique origin issues from all non-context rows in a file, excluding the current issue.
  * @param file Report commit file.
+ * @param currentIssueUrl URL of the currently analyzed issue to exclude.
  * @returns Unique related issue references.
  */
-function collectFileRelatedIssues(file: ReportCommitFile, currentIssueUrl: string): Array<{ webUrl: string; title: string }> {
+function collectFileOriginIssues(file: ReportCommitFile, currentIssueUrl: string): Array<{ webUrl: string; title: string }> {
   const refs = new Map<string, { webUrl: string; title: string }>();
   for (const chunk of file.chunks) {
     for (const row of chunk.rows) {
@@ -44,168 +45,83 @@ function collectFileRelatedIssues(file: ReportCommitFile, currentIssueUrl: strin
 }
 
 /**
- * Renders related issue links as an inline HTML fragment.
- * @param issues Related issue references.
- * @returns Inline HTML string.
- */
-function renderRelatedIssuesInline(issues: Array<{ webUrl: string; title: string }>): string {
-  return issues.length > 0
-    ? issues
-        .map((issue) => `<a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a>`)
-        .join("<br />")
-    : "";
-}
-
-/**
- * Expands files into overview rows including linked related issues.
- * @param issueKey Stable issue key.
- * @param mrKey Stable merge request key.
- * @param files Files to expand.
- * @returns Expanded overview file rows.
- */
-function expandFilesForOverview(
-  issueKey: string,
-  mrKey: string,
-  files: ReportCommitFile[],
-  currentIssueUrl: string,
-): Array<{ fileKey: string; fileHtml: string; issueHtml: string }> {
-  const expanded: Array<{ fileKey: string; fileHtml: string; issueHtml: string }> = [];
-
-  const uniqueFiles = new Map<string, ReportCommitFile>();
-  for (const file of files) {
-    if (!uniqueFiles.has(file.filePath)) {
-      uniqueFiles.set(file.filePath, file);
-    }
-  }
-
-  for (const file of uniqueFiles.values()) {
-    const issues = collectFileRelatedIssues(file, currentIssueUrl);
-    const fileHtml = `<code>${escapeHtml(file.filePath)}</code>`;
-
-    if (issues.length === 0) {
-      expanded.push({
-        fileKey: `${issueKey}||${mrKey}||${file.filePath}`,
-        fileHtml,
-        issueHtml: "",
-      });
-      continue;
-    }
-
-    for (const issue of issues) {
-      expanded.push({
-        fileKey: `${issueKey}||${mrKey}||${file.filePath}`,
-        fileHtml,
-        issueHtml: renderRelatedIssuesInline([issue]),
-      });
-    }
-  }
-
-  return expanded;
-}
-
-/**
- * Renders the top-level overview table for all analyzed issues.
+ * Renders the overview section as a nested MR → commit → file-type → issues tree.
  * @param results Analysis results collection.
+ * @param fileTypes File type configurations in list order (used for matching).
  * @returns HTML overview section.
  */
-function renderOverviewTable(results: AnalysisResult[]): string {
-  const rows: OverviewRow[] = [];
-
-  for (const result of results) {
-    const issueKey = result.inputIssue.web_url;
-    const issueHtml = `<a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${escapeHtml(String(result.inputIssue.iid))}</a> - ${escapeHtml(result.inputIssue.title)}`;
-
-    for (const mrSection of result.mergeRequests) {
-      const mrKey = `${mrSection.mr.projectId}:${mrSection.mr.iid}`;
-      const mrHtml = `<a href="${escapeHtml(mrSection.mr.webUrl ?? "")}" target="_blank" rel="noopener">!${escapeHtml(String(mrSection.mr.iid))}</a> ${escapeHtml(mrSection.mr.title ?? "")}`;
-
-      const allFiles = mrSection.commits.flatMap((commit) => commit.files);
-      const productionExpanded = expandFilesForOverview(issueKey, mrKey, allFiles.filter((file) => !file.isTestFile), result.inputIssue.web_url);
-      const testExpanded = expandFilesForOverview(issueKey, mrKey, allFiles.filter((file) => file.isTestFile), result.inputIssue.web_url);
-
-      const rowCount = Math.max(1, productionExpanded.length, testExpanded.length);
-      for (let index = 0; index < rowCount; index += 1) {
-        const production = productionExpanded[index] ?? null;
-        const test = testExpanded[index] ?? null;
-
-        rows.push({
-          issueKey,
-          issueHtml,
-          mrKey,
-          mrHtml,
-          productionFileKey: production?.fileKey ?? null,
-          productionFileHtml: production?.fileHtml ?? "",
-          productionIssueHtml: production?.issueHtml ?? "",
-          testFileKey: test?.fileKey ?? null,
-          testFileHtml: test?.fileHtml ?? "",
-          testIssueHtml: test?.issueHtml ?? "",
-        });
-      }
-    }
-  }
-
-  if (rows.length === 0) {
+function renderOverviewSection(results: AnalysisResult[], fileTypes: FileTypeConfig[]): string {
+  if (results.length === 0) {
     return "";
   }
 
-  const getRowSpan = (values: Array<string | null>, startIndex: number): number => {
-    const current = values[startIndex];
-    if (current === null) {
-      return 1;
-    }
-    let span = 1;
-    while (startIndex + span < values.length && values[startIndex + span] !== null && values[startIndex + span] === current) {
-      span += 1;
-    }
-    return span;
-  };
+  // Display order for the overview is determined by displayOrder, not list position.
+  const displaySortedTypes = [...fileTypes].sort((a, b) => a.displayOrder - b.displayOrder);
 
-  const issueKeys = rows.map((row) => row.issueKey);
-  const mrKeys = rows.map((row) => `${row.issueKey}||${row.mrKey}`);
-  const productionFileKeys = rows.map((row) => row.productionFileKey);
-  const testFileKeys = rows.map((row) => row.testFileKey);
+  const issueBlocks = results.map((result) => {
+    const issueLink = `<a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${result.inputIssue.iid}</a>`;
+    const currentIssueUrl = result.inputIssue.web_url;
 
-  const body = rows
-    .map((row, index) => {
-      const issueCell = index === 0 || issueKeys[index] !== issueKeys[index - 1]
-        ? `<td rowspan="${getRowSpan(issueKeys, index)}">${row.issueHtml}</td>`
-        : "";
-      const mrCell = index === 0 || mrKeys[index] !== mrKeys[index - 1]
-        ? `<td rowspan="${getRowSpan(mrKeys, index)}">${row.mrHtml}</td>`
-        : "";
-      const productionFileCell = row.productionFileKey && (index === 0 || productionFileKeys[index] !== productionFileKeys[index - 1])
-        ? `<td rowspan="${getRowSpan(productionFileKeys, index)}">${row.productionFileHtml}</td>`
-        : (row.productionFileKey ? "" : "<td></td>");
-      const productionIssueCell = row.productionFileKey && (index === 0 || productionFileKeys[index] !== productionFileKeys[index - 1])
-        ? `<td rowspan="${getRowSpan(productionFileKeys, index)}">${row.productionIssueHtml}</td>`
-        : (row.productionFileKey ? "" : "<td></td>");
-      const testFileCell = row.testFileKey && (index === 0 || testFileKeys[index] !== testFileKeys[index - 1])
-        ? `<td rowspan="${getRowSpan(testFileKeys, index)}">${row.testFileHtml}</td>`
-        : (row.testFileKey ? "" : "<td></td>");
-      const testIssueCell = row.testFileKey && (index === 0 || testFileKeys[index] !== testFileKeys[index - 1])
-        ? `<td rowspan="${getRowSpan(testFileKeys, index)}">${row.testIssueHtml}</td>`
-        : (row.testFileKey ? "" : "<td></td>");
+    const mrBlocks = result.mergeRequests.map((mrSection) => {
+      const mrLink = `<a href="${escapeHtml(mrSection.mr.webUrl ?? "")}" target="_blank" rel="noopener">!${mrSection.mr.iid}</a>`;
 
-      return `<tr>${issueCell}${mrCell}${productionFileCell}${productionIssueCell}${testFileCell}${testIssueCell}</tr>`;
-    })
-    .join("\n");
+      const commitBlocks = mrSection.commits.map((commit) => {
+        const commitLink = `<a href="${escapeHtml(commit.webUrl)}" target="_blank" rel="noopener">${escapeHtml(commit.shortSha)}</a>`;
+
+        const fileTypeBlocks = displaySortedTypes
+          .map((ft) => {
+            const filesOfType = commit.files.filter((f) => f.fileTypeDisplayOrder === ft.displayOrder);
+            if (filesOfType.length === 0) {
+              return "";
+            }
+
+            const originIssues = new Map<string, { webUrl: string; title: string }>();
+            for (const file of filesOfType) {
+              for (const issue of collectFileOriginIssues(file, currentIssueUrl)) {
+                if (!originIssues.has(issue.webUrl)) {
+                  originIssues.set(issue.webUrl, issue);
+                }
+              }
+            }
+
+            const issueItems = [...originIssues.values()]
+              .map((issue) => `<li><a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a></li>`)
+              .join("");
+
+            return `
+              <div class="overview-file-type">
+                <span class="overview-ft-header">${escapeHtml(ft.icon)} ${escapeHtml(ft.typeName)}</span>
+                ${issueItems ? `<ul class="overview-ft-issues">${issueItems}</ul>` : ""}
+              </div>`;
+          })
+          .filter((block) => block.length > 0)
+          .join("");
+
+        return `
+          <details class="overview-commit" open>
+            <summary>${commitLink} — ${escapeHtml(commit.title)}</summary>
+            ${fileTypeBlocks || '<div class="overview-empty">No file type data.</div>'}
+          </details>`;
+      }).join("");
+
+      return `
+        <details class="overview-mr" open>
+          <summary>${mrLink} ${escapeHtml(mrSection.mr.title ?? "")}</summary>
+          ${commitBlocks || '<div class="overview-empty">No commits.</div>'}
+        </details>`;
+    }).join("");
+
+    return `
+      <div class="overview-issue">
+        <h3 class="overview-issue-title">${issueLink} — ${escapeHtml(result.inputIssue.title)}</h3>
+        ${mrBlocks || '<div class="overview-empty">No related merged MRs found.</div>'}
+      </div>`;
+  }).join("");
 
   return `
     <section class="overview">
       <h2>Overview</h2>
-      <table class="overview-table">
-        <thead>
-          <tr>
-            <th>Issue analyzed</th>
-            <th>Merge request</th>
-            <th>Production code file</th>
-            <th>Issue of origin (production)</th>
-            <th>Test code file</th>
-            <th>Issue of origin (tests)</th>
-          </tr>
-        </thead>
-        <tbody>${body}</tbody>
-      </table>
+      ${issueBlocks}
     </section>
   `;
 }
@@ -214,7 +130,7 @@ function renderOverviewTable(results: AnalysisResult[]): string {
  * Optional controls for report rendering behavior.
  */
 interface HtmlRenderOptions {
-  testFileGlob?: string[];
+  fileTypes?: FileTypeConfig[];
 }
 
 /**
@@ -234,22 +150,6 @@ type CommitTableRow =
 interface ProvenanceCellValue {
   html: string;
   dimmed: boolean;
-}
-
-/**
- * Expanded row model used to render overview table row spans.
- */
-interface OverviewRow {
-  issueKey: string;
-  issueHtml: string;
-  mrKey: string;
-  mrHtml: string;
-  productionFileKey: string | null;
-  productionFileHtml: string;
-  productionIssueHtml: string;
-  testFileKey: string | null;
-  testFileHtml: string;
-  testIssueHtml: string;
 }
 
 /**
@@ -540,8 +440,7 @@ function renderFailedIssueSection(item: FailedIssueRenderItem, index: number): s
  * @returns HTML file details block.
  */
 function renderFile(file: ReportCommitFile, currentIssueUrl: string): string {
-  const kindEmoji = file.isTestFile ? "🧪" : "🏭";
-  const fileTitle = `${kindEmoji} ${file.filePath}`;
+  const fileTitle = `${file.fileTypeIcon} ${file.filePath}`;
   if (file.skippedReason) {
     return `
       <details class="file" open>
@@ -649,22 +548,28 @@ export function renderHtmlReport(result: AnalysisResult): string {
 }
 
 /**
- * Marks files as test files according to configured glob patterns.
+ * Resolves and stamps file type metadata onto every file using the provided config.
  * @param results Analysis results.
- * @param testFileGlob Test file glob patterns.
- * @returns Results with test-file markers applied.
+ * @param fileTypes File type configurations in list order (matching uses list position).
+ * @returns Results with file type fields applied.
  */
-function withTestFileMarkers(results: AnalysisResult[], testFileGlob: readonly string[]): AnalysisResult[] {
+function withFileTypeMarkers(results: AnalysisResult[], fileTypes: FileTypeConfig[]): AnalysisResult[] {
   return results.map((result) => ({
     ...result,
     mergeRequests: result.mergeRequests.map((mr) => ({
       ...mr,
       commits: mr.commits.map((commit) => ({
         ...commit,
-        files: commit.files.map((file) => ({
-          ...file,
-          isTestFile: testFileGlob.length > 0 ? matchesAnyGlob(file.filePath, testFileGlob) : false,
-        })),
+        files: commit.files.map((file) => {
+          const projectPath = mr.mr.projectPathWithNamespace ?? "";
+          const ft = resolveFileType(projectPath, file.filePath, fileTypes);
+          return {
+            ...file,
+            fileTypeName: ft.typeName,
+            fileTypeIcon: ft.icon,
+            fileTypeDisplayOrder: ft.displayOrder,
+          };
+        }),
       })),
     })),
   }));
@@ -682,10 +587,10 @@ export function renderHtmlReports(
   failedIssues: FailedIssueRenderItem[] = [],
   options: HtmlRenderOptions = {},
 ): string {
-  const testFileGlob = options.testFileGlob ?? [];
-  const enriched = withTestFileMarkers(results, testFileGlob);
+  const fileTypes = options.fileTypes ?? [{ typeName: "Files", projectPathGlobs: [], filePathGlobs: [], icon: "📄", displayOrder: 1 }];
+  const enriched = withFileTypeMarkers(results, fileTypes);
   const generatedAt = enriched.find((result) => result.generatedAt)?.generatedAt ?? null;
-  const overviewSection = renderOverviewTable(enriched);
+  const overviewSection = renderOverviewSection(enriched, fileTypes);
   const successSections = enriched
     .map((result, index) => renderIssueSection(result, index))
     .join("\n");
@@ -722,10 +627,20 @@ export function renderHtmlReports(
       .issue-section { margin-top: 20px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
       .issue-section:first-of-type { margin-top: 0; }
       .overview { margin-top: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
-      .overview-table { width: 100%; border-collapse: collapse; table-layout: auto; }
-      .overview-table td, .overview-table th { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
-      .overview-table th { text-align: left; color: var(--muted); font-weight: 600; }
-      .overview-table code { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+      .overview-issue { margin-top: 12px; }
+      .overview-issue:first-of-type { margin-top: 0; }
+      .overview-issue-title { margin: 0 0 8px 0; font-size: 1rem; }
+      .overview-mr { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-top: 8px; }
+      .overview-mr > summary { cursor: pointer; font-weight: 600; list-style: none; }
+      .overview-mr > summary::-webkit-details-marker { display: none; }
+      .overview-commit { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin-top: 6px; }
+      .overview-commit > summary { cursor: pointer; list-style: none; color: var(--muted); font-size: 0.9rem; }
+      .overview-commit > summary::-webkit-details-marker { display: none; }
+      .overview-file-type { margin-top: 6px; padding-left: 4px; }
+      .overview-ft-header { font-weight: 600; font-size: 0.85rem; }
+      .overview-ft-issues { margin: 2px 0 0 0; padding-left: 18px; font-size: 0.85rem; }
+      .overview-ft-issues li { margin: 1px 0; }
+      .overview-empty { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
       .issue { display: block; }
       .issue > summary { font-weight: 600; }
       h1, h2, h3, h4, h5 { margin: 0 0 8px 0; }

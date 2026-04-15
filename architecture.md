@@ -2,11 +2,13 @@
 
 ## Modules
 
-- `src/cli.ts`: CLI argument parsing and orchestration.
+- `src/cli.ts`: CLI argument parsing and orchestration. Loads `regrizer.yaml` from the current working directory via `loadRegrizerConfig` and passes the resolved file type list to the renderer.
+- `src/fileTypeConfig.ts`: `regrizer.yaml` loading, validation, and file type resolution (`loadRegrizerConfig`, `resolveFileType`).
 - `src/gitlabClient.ts`: GitLab REST/GraphQL client and request helpers.
-- `src/analyzer.ts`: Analysis pipeline (issue -> MRs -> merged commit -> files -> chunks -> blame attribution).
+- `src/analyzer.ts`: Analysis pipeline (issue -> MRs -> merged commit -> files -> chunks -> blame attribution). Files are emitted with placeholder file type fields; the renderer stamps the resolved values.
 - `src/diffParser.ts`: Unified diff hunk parsing.
-- `src/reportRenderer.ts`: HTML rendering of the nested report model.
+- `src/reportRenderer.ts`: HTML rendering of the nested report model. `withFileTypeMarkers` resolves each file's type using `resolveFileType` and stamps `fileTypeName`, `fileTypeIcon`, and `fileTypeDisplayOrder`. The overview is rendered as a collapsible MR → commit → file-type → issues tree.
+- `src/globMatcher.ts`: Glob-to-regexp conversion and path matching used by file type resolution.
 - `src/types.ts`: Shared API and report data structures.
 - `src/logger.ts`: Verbose logger (`--verbose`).
 
@@ -129,9 +131,17 @@ When related issues on a row include the currently analyzed issue, the renderer 
 
 No API call in this step.
 
-The renderer outputs nested `details/summary` sections for issue -> MR -> commit -> file (all `open` by default), with one color-coded unified table per file (`context`, `paired`, `added`, `removed` rows).
+Before rendering, `withFileTypeMarkers` iterates every file in every commit and calls `resolveFileType(mrProjectPath, filePath, fileTypes)` to stamp `fileTypeName`, `fileTypeIcon`, and `fileTypeDisplayOrder` onto each `ReportCommitFile`. `fileTypes` comes from `regrizer.yaml` (or a single default catch-all type named **Files** with icon **📄** when that file is absent). `resolveFileType` returns the first entry in list order whose project-path and file-path globs both match. `displayOrder` is used only to sort file types for display in the overview.
 
-In the overview table, origin-issue cells exclude the currently analyzed issue while retaining any other related origin issues.
+The **overview** is a collapsible tree rendered at the top of the report:
+
+- Per analyzed issue (header)
+- Per related MR (`<details open>`)
+- Per commit in that MR (`<details open>`)
+- Per file type present in that commit, in `displayOrder` order; types with no files in the commit are omitted
+- For each file type: unique origin issues from all files of that type, excluding the currently analyzed issue
+
+The **detail sections** output nested `details/summary` for issue → MR → commit → file (all `open` by default), with one color-coded unified table per file (`context`, `paired`, `added`, `removed` rows). Each file label is prefixed with its file type icon.
 
 Each commit header includes one compact line with `Committed ... · Committer: ...` metadata.
 
@@ -150,6 +160,8 @@ For readability, repeated consecutive values in these provenance columns are ren
 - previous commit
 - merge request
 - related issues
+
+When related issues on a row include the currently analyzed issue, the renderer marks all three provenance columns for that row group with reduced visual emphasis.
 
 ## Run tests
 

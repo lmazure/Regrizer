@@ -55,7 +55,9 @@ describe("renderHtmlReport", () => {
       {
         filePath: "src/file.ts",
         oldPath: "src/file.ts",
-        isTestFile: false,
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
         chunks: [
           {
             oldStart: 10,
@@ -94,7 +96,9 @@ describe("renderHtmlReport", () => {
       {
         filePath: "src/other.ts",
         oldPath: "src/other.ts",
-        isTestFile: false,
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
         chunks: [
           {
             oldStart: 2,
@@ -131,7 +135,9 @@ describe("renderHtmlReport", () => {
       {
         filePath: "src/file.ts",
         oldPath: "src/file.ts",
-        isTestFile: false,
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
         chunks: [
           {
             oldStart: 5,
@@ -198,7 +204,9 @@ describe("renderHtmlReport", () => {
         filePath: "src/file.ts",
         oldPath: "src/file.ts",
         fileLineCount: 100,
-        isTestFile: false,
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
         chunks: [
           {
             oldStart: 40,
@@ -232,7 +240,9 @@ describe("renderHtmlReport", () => {
       {
         filePath: "src/origin.ts",
         oldPath: "src/origin.ts",
-        isTestFile: false,
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
         chunks: [
           {
             oldStart: 1,
@@ -276,7 +286,9 @@ describe("renderHtmlReport", () => {
       {
         filePath: "src/provenance.ts",
         oldPath: "src/provenance.ts",
-        isTestFile: false,
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
         chunks: [
           {
             oldStart: 1,
@@ -332,7 +344,9 @@ describe("renderHtmlReport", () => {
       {
         filePath: "src/deleted.ts",
         oldPath: "src/deleted.ts",
-        isTestFile: false,
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
         chunks: [
           {
             oldStart: 1,

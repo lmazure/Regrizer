@@ -51,14 +51,6 @@ Additional issue URLs can also be passed positionally after the first `--issue-u
 node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" "https://gitlab.example.com/group/project/-/issues/456"
 ```
 
-Classify files as test vs production in the HTML report with `--test-file-glob` (comma-separated list of globs). Any file whose path matches one of the globs is marked as test:
-
-```bash
-node dist/src/cli.js \
-  --issue-url "https://gitlab.example.com/group/project/-/issues/123" \
-  --test-file-glob "**/*.test.ts,**/__tests__/**"
-```
-
 The generated `--output` file will contain one section per input issue.
 
 If one issue fails (for example, 404 not found), Regrizer continues analyzing the remaining issues, logs the failure to stderr, and includes a failed-issue section in the final HTML report.
@@ -94,14 +86,52 @@ Run directly in dev mode:
 npm run dev -- --issue-url "https://gitlab.example.com/group/project/-/issues/123"
 ```
 
+## File type classification (regrizer.yaml)
+
+Place a `regrizer.yaml` file in the directory where you run the CLI to classify files into named types. If the file is absent, a single default type named **Files** with icon **📄** covering all files is used.
+
+```yaml
+fileTypes:
+  - typeName: Production
+    icon: 🏭
+    displayOrder: 1
+    projectPathGlobs:
+      - "mygroup/**"
+    filePathGlobs:
+      - "src/**"
+      - "lib/**"
+  - typeName: Tests
+    icon: 🧪
+    displayOrder: 2
+    filePathGlobs:
+      - "**/*.test.ts"
+      - "**/__tests__/**"
+  - typeName: All files
+    icon: 📄
+    displayOrder: 99
+```
+
+Rules:
+- `typeName`, `icon`, and `displayOrder` are required for every entry.
+- `projectPathGlobs` and `filePathGlobs` are optional; an absent or empty list matches everything.
+- A file's type is the **first entry in the list** whose project-path and file-path globs both match.
+- The **last entry in the list** must have no globs so it acts as a catch-all.
+- `displayOrder` controls only the order in which types appear in the overview, not the matching priority.
+- No two entries may share the same `displayOrder`.
+
 ## Report structure
 
 The report hierarchy is:
 
-1. An overview table at the top of the report summarizing, per input issue and per related merge request, the production/test files touched and the origin issues detected for each file
+1. An **overview** at the top of the report, structured as:
+   - Per analyzed issue
+   - Per related merge request (collapsible)
+   - Per commit in that MR (collapsible)
+   - Per file type present in that commit (in `displayOrder` order; types with no matching files are omitted)
+   - List of origin issues that introduced the lines changed by the commit (the currently analyzed issue is hidden; only issues introduced by other work appear)
 2. Merge requests (latest merged first)
 3. Commit selected as the merge result on target branch
-4. Files touched by that commit
+4. Files touched by that commit, each labeled with its file type icon
 5. For each file:
    - a single table containing all modified chunks for that file
    - each gap between two non-overlapping chunk groups is rendered as a separator row with `…` in every column
@@ -122,4 +152,3 @@ The report hierarchy is:
 7. Every hierarchy level (MR, commit, file) is collapsible and expanded by default when the report opens
 8. Each commit section shows one compact metadata line with commit timestamp and committer identity (`Name <email>`) when available
 9. Each merge request section shows a `Project` line (from the MR's own project, which may differ from the input issue project) plus merged timestamp, author, assignees, and reviewers metadata
-10. In the overview table, "Issue of origin" columns exclude the currently analyzed issue (other origin issues remain visible)
