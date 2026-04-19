@@ -147,6 +147,8 @@ Each commit header includes one compact line with `Committed ... · Committer: .
 
 Each merge request header includes a `Project` line showing the MR project path, followed by one compact line with `Merged ... · Author: ... · Assignees: ... · Reviewers: ...` metadata.
 
+Within a file table, the `Code after commit` and `Code before commit` column titles link to GitLab blame pages when the MR project web URL is known. The links are built as `projectWebUrl/-/blame/<sha>/<filePath>`, using the commit SHA for the post-image and the first parent SHA (`parent_ids[0]`) for the pre-image.
+
 Within a file table, non-overlapping chunk groups are separated by a row containing `…` in every column. Overlapping/adjacent groups are merged into a single contiguous section.
 
 When Regrizer can determine post-image file length, it also adds boundary separators: one at the top if the first visible numbered row is not line 1, and one at the bottom if the last visible numbered row is not the file's last line.

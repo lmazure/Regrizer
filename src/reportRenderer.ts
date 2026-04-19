@@ -6,6 +6,22 @@ function normalizeIssueUrl(url: string): string {
   return url.trim().replace(/\/+$/, "").toLowerCase();
 }
 
+function normalizeProjectWebUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "");
+}
+
+function encodeGitLabFilePath(filePath: string): string {
+  return filePath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
+function buildGitLabBlameUrl(projectWebUrl: string, sha: string, filePath: string): string {
+  const base = normalizeProjectWebUrl(projectWebUrl);
+  return `${base}/-/blame/${encodeURIComponent(sha)}/${encodeGitLabFilePath(filePath)}`;
+}
+
 function isSameIssueUrl(left: string, right: string): boolean {
   return normalizeIssueUrl(left) === normalizeIssueUrl(right);
 }
@@ -407,12 +423,25 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
  * @param file Report commit file.
  * @returns HTML file table.
  */
-function renderFileTable(file: ReportCommitFile, currentIssueUrl: string): string {
+function renderFileTable(
+  file: ReportCommitFile,
+  currentIssueUrl: string,
+  projectWebUrl: string | undefined,
+  commitSha: string,
+  parentSha: string | undefined,
+): string {
   const rows = renderCommitTableRows(buildFileTableRows(file), currentIssueUrl);
+
+  const codeAfterHeader = projectWebUrl
+    ? `<a href="${escapeHtml(buildGitLabBlameUrl(projectWebUrl, commitSha, file.filePath))}" target="_blank" rel="noopener">Code after commit</a>`
+    : "Code after commit";
+  const codeBeforeHeader = projectWebUrl && parentSha
+    ? `<a href="${escapeHtml(buildGitLabBlameUrl(projectWebUrl, parentSha, file.oldPath))}" target="_blank" rel="noopener">Code before commit</a>`
+    : "Code before commit";
 
   return `
     <table class="code-table">
-      <thead><tr><th class="ln">Line</th><th>Code after commit</th><th>Code before commit</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
+      <thead><tr><th class="ln">Line</th><th>${codeAfterHeader}</th><th>${codeBeforeHeader}</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
       <tbody>${rows || ""}</tbody>
     </table>
   `;
@@ -439,7 +468,13 @@ function renderFailedIssueSection(item: FailedIssueRenderItem, index: number): s
  * @param file Report commit file.
  * @returns HTML file details block.
  */
-function renderFile(file: ReportCommitFile, currentIssueUrl: string): string {
+function renderFile(
+  file: ReportCommitFile,
+  currentIssueUrl: string,
+  projectWebUrl: string | undefined,
+  commitSha: string,
+  parentSha: string | undefined,
+): string {
   const fileTitle = `${file.fileTypeIcon} ${file.filePath}`;
   if (file.skippedReason) {
     return `
@@ -450,7 +485,7 @@ function renderFile(file: ReportCommitFile, currentIssueUrl: string): string {
     `;
   }
 
-  const table = renderFileTable(file, currentIssueUrl);
+  const table = renderFileTable(file, currentIssueUrl, projectWebUrl, commitSha, parentSha);
 
   return `
     <details class="file" open>
@@ -466,9 +501,10 @@ function renderFile(file: ReportCommitFile, currentIssueUrl: string): string {
  * @param commit Report commit.
  * @returns HTML commit details block.
  */
-function renderCommit(commit: ReportCommit, currentIssueUrl: string): string {
+function renderCommit(commit: ReportCommit, currentIssueUrl: string, projectWebUrl: string | undefined): string {
+  const parentSha = commit.parentIds[0];
   const files = commit.files
-    .map((file) => renderFile(file, currentIssueUrl))
+    .map((file) => renderFile(file, currentIssueUrl, projectWebUrl, commit.sha, parentSha))
     .join("\n");
   const committerText = commit.committerName && commit.committerEmail
     ? `${commit.committerName} <${commit.committerEmail}>`
@@ -491,7 +527,7 @@ function renderCommit(commit: ReportCommit, currentIssueUrl: string): string {
  */
 function renderMergeRequest(section: ReportMergeRequest, currentIssueUrl: string): string {
   const commits = section.commits
-    .map((commit) => renderCommit(commit, currentIssueUrl))
+    .map((commit) => renderCommit(commit, currentIssueUrl, section.mr.projectWebUrl))
     .join("\n");
   const projectLabel = section.mr.projectPathWithNamespace ?? String(section.mr.projectId);
   const projectHtml = section.mr.projectWebUrl

@@ -123,6 +123,8 @@ describe("renderHtmlReport", () => {
     const html = renderHtmlReport(result);
 
     expect((html.match(/<table class="code-table">/g) ?? []).length).toBe(2);
+    expect(html).toContain('<th><a href="https://gitlab.example.com/group/project/-/blame/1234567890abcdef1234567890abcdef12345678/src/file.ts" target="_blank" rel="noopener">Code after commit</a></th>');
+    expect(html).toContain('<th><a href="https://gitlab.example.com/group/project/-/blame/parent-sha/src/file.ts" target="_blank" rel="noopener">Code before commit</a></th>');
     expect((html.match(/<tr class="row-separator">/g) ?? []).length).toBe(1);
     expect((html.match(/>…</g) ?? []).length).toBeGreaterThanOrEqual(6);
     expect(html).toContain('<div class="meta"><span class="label">Project</span> <a href="https://gitlab.example.com/group/project" target="_blank" rel="noopener">group/project</a></div>');

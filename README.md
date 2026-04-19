@@ -145,6 +145,7 @@ The report hierarchy is:
      - previous commit
      - merge request
      - related issues
+   - the `code after commit` / `code before commit` column titles link to GitLab blame pages for the corresponding file at the post-image and pre-image commit SHAs
    - previous commit / merge request / related issues cells are vertically merged when consecutive rows have the same value
    - when a row's related issues include the currently analyzed issue, those three provenance cells are rendered with reduced emphasis
    - unchanged rows fill only line number + code-after columns
