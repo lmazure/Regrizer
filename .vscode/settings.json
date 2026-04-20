@@ -1,0 +1,14 @@
+{
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "icon": "terminal-powershell"
+        },
+        "Git": {
+            "path": "G:/Documents/tools/Git/2.52.0/bin/bash.exe",
+            "icon": "terminal-bash"
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "Git",
+    "editor.stickyScroll.enabled": false
+}

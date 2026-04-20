@@ -1,0 +1,10 @@
+node_modules/
+dist/
+# ignore HTML reports
+*.html
+# ignore list of issues
+*txt
+# ignore configuration files
+*.yaml
+# ignore secret files
+.env
