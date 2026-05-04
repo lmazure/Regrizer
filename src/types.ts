@@ -160,6 +160,7 @@ export interface ReportLine {
  */
 export interface ReportChunkRow {
   lineNumber: number | null;
+  beforeLineNumber?: number | null;
   afterText: string;
   beforeText?: string;
   previousCommitSha?: string | null;

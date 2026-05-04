@@ -372,6 +372,6 @@ describe("renderHtmlReport", () => {
 
     expect(html).toContain(".code-table td > code { display: inline-block; min-height: 1em; }");
     expect(html).toContain('<tr class="row-removed">');
-    expect(html).toContain("<td><code></code></td><td><code>removed-line</code></td>");
+    expect(html).toContain("<td><code></code></td><td class=\"ln\"></td><td><code>removed-line</code></td>");
   });
 });

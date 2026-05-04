@@ -141,6 +141,7 @@ The report hierarchy is:
 6. Table columns:
      - line number (as in file after commit)
      - code after commit
+     - line number (as in file before commit)
      - code before commit
      - previous commit
      - merge request
@@ -148,7 +149,7 @@ The report hierarchy is:
    - the `code after commit` / `code before commit` column titles link to GitLab blame pages for the corresponding file at the post-image and pre-image commit SHAs
    - previous commit / merge request / related issues cells are vertically merged when consecutive rows have the same value
    - when a row's related issues include the currently analyzed issue, those three provenance cells are rendered with reduced emphasis
-   - unchanged rows fill only line number + code-after columns
+   - unchanged rows fill line number, code-after, line-number-before, and code-before columns (the code is identical before and after; the before line number is shown for context rows within a diff hunk)
    - changed rows fill before/provenance columns when applicable
 7. Every hierarchy level (MR, commit, file) is collapsible and expanded by default when the report opens
 8. Each commit section shows one compact metadata line with commit timestamp and committer identity (`Name <email>`) when available

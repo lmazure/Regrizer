@@ -313,6 +313,7 @@ export class IssueAnalyzer {
       rows.push({
         lineNumber: line.lineNumber,
         afterText: line.text,
+        beforeText: line.text,
         rowKind: "context",
       });
     }
@@ -329,6 +330,7 @@ export class IssueAnalyzer {
         const before = pendingBefore[i];
         rows.push({
           lineNumber: after.lineNumber,
+          beforeLineNumber: before.lineNumber,
           afterText: after.text,
           beforeText: before.text,
           previousCommitSha: before.previousCommitSha,
@@ -353,6 +355,7 @@ export class IssueAnalyzer {
         const before = pendingBefore[i];
         rows.push({
           lineNumber: null,
+          beforeLineNumber: before.lineNumber,
           afterText: "",
           beforeText: before.text,
           previousCommitSha: before.previousCommitSha,
@@ -373,7 +376,9 @@ export class IssueAnalyzer {
         flushPendingChanges();
         rows.push({
           lineNumber: entry.newLineNumber,
+          beforeLineNumber: entry.oldLineNumber,
           afterText: entry.text,
+          beforeText: entry.text,
           rowKind: "context",
         });
         continue;
@@ -407,6 +412,7 @@ export class IssueAnalyzer {
       rows.push({
         lineNumber: line.lineNumber,
         afterText: line.text,
+        beforeText: line.text,
         rowKind: "context",
       });
     }

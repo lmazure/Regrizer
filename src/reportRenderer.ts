@@ -396,7 +396,7 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
   return rows
     .map((item, index) => {
       if (item.kind === "separator") {
-        return "<tr class=\"row-separator\"><td class=\"ln\">…</td><td>…</td><td>…</td><td class=\"provenance provenance-commit\">…</td><td class=\"provenance provenance-mr\">…</td><td class=\"provenance provenance-issues\">…</td></tr>";
+        return "<tr class=\"row-separator\"><td class=\"ln\">…</td><td>…</td><td class=\"ln\">…</td><td>…</td><td class=\"provenance provenance-commit\">…</td><td class=\"provenance provenance-mr\">…</td><td class=\"provenance provenance-issues\">…</td></tr>";
       }
 
       const row = item.row;
@@ -413,7 +413,7 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
         ? `<td class="provenance provenance-issues${issuesValue?.dimmed ? " provenance-dimmed" : ""}" rowspan="${getRowSpan(issuesValues, index)}">${issuesValue?.html ?? ""}</td>`
         : "";
 
-      return `<tr class="row-${row.rowKind}"><td class="ln">${row.lineNumber ?? ""}</td><td><code>${escapeHtml(row.afterText)}</code></td><td><code>${escapeHtml(row.beforeText ?? "")}</code></td>${commitCell}${mrCell}${issuesCell}</tr>`;
+      return `<tr class="row-${row.rowKind}"><td class="ln">${row.lineNumber ?? ""}</td><td><code>${escapeHtml(row.afterText)}</code></td><td class="ln">${row.beforeLineNumber ?? ""}</td><td><code>${escapeHtml(row.beforeText ?? "")}</code></td>${commitCell}${mrCell}${issuesCell}</tr>`;
     })
     .join("\n");
 }
@@ -441,7 +441,7 @@ function renderFileTable(
 
   return `
     <table class="code-table">
-      <thead><tr><th class="ln">Line</th><th>${codeAfterHeader}</th><th>${codeBeforeHeader}</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
+      <thead><tr><th class="ln">Line</th><th>${codeAfterHeader}</th><th class="ln">Line</th><th>${codeBeforeHeader}</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
       <tbody>${rows || ""}</tbody>
     </table>
   `;
@@ -696,10 +696,10 @@ export function renderHtmlReports(
       .code-table td, .code-table th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; white-space: nowrap; line-height: 1.4; }
       .ln { width: 70px; color: var(--muted); text-align: right; }
       .code-table th:nth-child(2), .code-table td:nth-child(2) { min-width: 520px; }
-      .code-table th:nth-child(3), .code-table td:nth-child(3) { min-width: 520px; }
-      .code-table th:nth-child(4), .code-table td:nth-child(4) { min-width: 150px; }
-      .code-table th:nth-child(5), .code-table td:nth-child(5) { min-width: 120px; }
-      .code-table th:nth-child(6), .code-table td:nth-child(6) { min-width: 420px; }
+      .code-table th:nth-child(4), .code-table td:nth-child(4) { min-width: 520px; }
+      .code-table th:nth-child(5), .code-table td:nth-child(5) { min-width: 150px; }
+      .code-table th:nth-child(6), .code-table td:nth-child(6) { min-width: 120px; }
+      .code-table th:nth-child(7), .code-table td:nth-child(7) { min-width: 420px; }
       tr.row-added td { background: var(--after); }
       tr.row-removed td { background: var(--before); }
       tr.row-paired td { background: var(--paired); }

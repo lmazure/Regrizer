@@ -141,7 +141,7 @@ The **overview** is a collapsible tree rendered at the top of the report:
 - Per file type present in that commit, in `displayOrder` order; types with no files in the commit are omitted
 - For each file type: unique origin issues from all files of that type, excluding the currently analyzed issue
 
-The **detail sections** output nested `details/summary` for issue → MR → commit → file (all `open` by default), with one color-coded unified table per file (`context`, `paired`, `added`, `removed` rows). Each file label is prefixed with its file type icon.
+The **detail sections** output nested `details/summary` for issue → MR → commit → file (all `open` by default), with one color-coded unified table per file (`context`, `paired`, `added`, `removed` rows). Each file label is prefixed with its file type icon. The table has seven columns: line number (after), code after commit, line number (before), code before commit, previous commit, merge request, related issues. The before-side line number is populated for hunk-internal context rows (from `entry.oldLineNumber`) and for paired/removed rows (from `before.lineNumber`). The code-before column is populated for all row kinds: context rows carry the same text as code-after, and changed rows carry the pre-image text.
 
 Each commit header includes one compact line with `Committed ... · Committer: ...` metadata.
 
