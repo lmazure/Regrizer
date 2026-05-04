@@ -39,6 +39,7 @@ export function computeContextAfterLineOffset(oldStart: number, oldCount: number
  */
 interface PreviousCommitContext {
   commitWebUrl: string | null;
+  commitMessage: string | null;
   mergeRequest: GitLabMergeRequestRef | null;
   mergeRequestIssues: RelatedIssueRef[];
 }
@@ -266,6 +267,7 @@ export class IssueAnalyzer {
           text,
           previousCommitSha,
           previousCommitWebUrl: previousContext?.commitWebUrl ?? null,
+          previousCommitMessage: previousContext?.commitMessage ?? null,
           previousMergeRequest: previousContext?.mergeRequest ?? null,
           previousMergeRequestIssues: previousContext?.mergeRequestIssues ?? [],
           unresolvedReason: previousCommitSha ? undefined : "Blame did not return a commit",
@@ -356,6 +358,7 @@ export class IssueAnalyzer {
           beforeText: before.text,
           previousCommitSha: before.previousCommitSha,
           previousCommitWebUrl: before.previousCommitWebUrl,
+          previousCommitMessage: before.previousCommitMessage,
           previousMergeRequest: before.previousMergeRequest,
           previousMergeRequestIssues: before.previousMergeRequestIssues,
           unresolvedReason: before.unresolvedReason,
@@ -381,6 +384,7 @@ export class IssueAnalyzer {
           beforeText: before.text,
           previousCommitSha: before.previousCommitSha,
           previousCommitWebUrl: before.previousCommitWebUrl,
+          previousCommitMessage: before.previousCommitMessage,
           previousMergeRequest: before.previousMergeRequest,
           previousMergeRequestIssues: before.previousMergeRequestIssues,
           unresolvedReason: before.unresolvedReason,
@@ -509,6 +513,7 @@ export class IssueAnalyzer {
 
       const context: PreviousCommitContext = {
         commitWebUrl: commit.web_url ?? null,
+        commitMessage: commit.message ?? null,
         mergeRequest,
         mergeRequestIssues,
       };

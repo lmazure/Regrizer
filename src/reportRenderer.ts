@@ -340,11 +340,14 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
     }
 
     const row = item.row;
+    const titleAttr = row.previousCommitSha && row.previousCommitMessage
+      ? ` title="${escapeHtml(row.previousCommitMessage)}"`
+      : "";
     return {
       html: row.previousCommitSha
     ? (row.previousCommitWebUrl
-      ? `<a href="${escapeHtml(row.previousCommitWebUrl)}" target="_blank" rel="noopener"><code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code></a>`
-      : `<code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code>`)
+      ? `<a href="${escapeHtml(row.previousCommitWebUrl)}"${titleAttr} target="_blank" rel="noopener"><code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code></a>`
+      : `<code${titleAttr}>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code>`)
     : (row.unresolvedReason ? `<span class="unresolved">${escapeHtml(row.unresolvedReason)}</span>` : ""),
       dimmed: includesCurrentIssue(item),
     } satisfies ProvenanceCellValue;

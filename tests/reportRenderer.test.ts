@@ -475,6 +475,77 @@ describe("renderHtmlReport", () => {
     expect((separatorRow.match(/>…</g) ?? []).length).toBe(7);
   });
 
+  it("renders commit message as title attribute on commit link when available", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "after",
+                beforeText: "before",
+                previousCommitSha: "abcdef123456abcdef123456abcdef1234567890",
+                previousCommitWebUrl: "https://gitlab.example.com/group/project/-/commit/abcdef123456",
+                previousCommitMessage: "Fix: resolve null pointer\n\nDetailed explanation here.",
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+
+    expect(html).toContain('title="Fix: resolve null pointer\n\nDetailed explanation here."');
+    expect(html).toContain('href="https://gitlab.example.com/group/project/-/commit/abcdef123456"');
+  });
+
+  it("renders commit SHA without title attribute when commit message is absent", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "after",
+                beforeText: "before",
+                previousCommitSha: "abcdef123456abcdef123456abcdef1234567890",
+                previousCommitWebUrl: "https://gitlab.example.com/group/project/-/commit/abcdef123456",
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+
+    expect(html).toContain('<a href="https://gitlab.example.com/group/project/-/commit/abcdef123456" target="_blank"');
+    expect(html).not.toContain(" title=");
+  });
+
   it("keeps empty code cells at consistent height via code-table CSS", () => {
     const result = buildResult([
       {

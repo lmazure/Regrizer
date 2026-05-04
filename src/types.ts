@@ -150,6 +150,7 @@ export interface ReportLine {
   text: string;
   previousCommitSha?: string | null;
   previousCommitWebUrl?: string | null;
+  previousCommitMessage?: string | null;
   previousMergeRequest?: GitLabMergeRequestRef | null;
   previousMergeRequestIssues?: RelatedIssueRef[];
   unresolvedReason?: string;
@@ -165,6 +166,7 @@ export interface ReportChunkRow {
   beforeText?: string;
   previousCommitSha?: string | null;
   previousCommitWebUrl?: string | null;
+  previousCommitMessage?: string | null;
   previousMergeRequest?: GitLabMergeRequestRef | null;
   previousMergeRequestIssues?: RelatedIssueRef[];
   unresolvedReason?: string;
