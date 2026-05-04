@@ -8,6 +8,7 @@ import {
   GitLabMergeRequest,
   GitLabMergeRequestRef,
   ParsedIssueUrl,
+  PreviousCommitMeta,
   RelatedIssueRef,
   ReportChunk,
   ReportChunkRow,
@@ -40,6 +41,7 @@ export function computeContextAfterLineOffset(oldStart: number, oldCount: number
 interface PreviousCommitContext {
   commitWebUrl: string | null;
   commitMessage: string | null;
+  commitMeta: PreviousCommitMeta | null;
   mergeRequest: GitLabMergeRequestRef | null;
   mergeRequestIssues: RelatedIssueRef[];
 }
@@ -268,6 +270,7 @@ export class IssueAnalyzer {
           previousCommitSha,
           previousCommitWebUrl: previousContext?.commitWebUrl ?? null,
           previousCommitMessage: previousContext?.commitMessage ?? null,
+          previousCommitMeta: previousContext?.commitMeta ?? null,
           previousMergeRequest: previousContext?.mergeRequest ?? null,
           previousMergeRequestIssues: previousContext?.mergeRequestIssues ?? [],
           unresolvedReason: previousCommitSha ? undefined : "Blame did not return a commit",
@@ -359,6 +362,7 @@ export class IssueAnalyzer {
           previousCommitSha: before.previousCommitSha,
           previousCommitWebUrl: before.previousCommitWebUrl,
           previousCommitMessage: before.previousCommitMessage,
+          previousCommitMeta: before.previousCommitMeta,
           previousMergeRequest: before.previousMergeRequest,
           previousMergeRequestIssues: before.previousMergeRequestIssues,
           unresolvedReason: before.unresolvedReason,
@@ -385,6 +389,7 @@ export class IssueAnalyzer {
           previousCommitSha: before.previousCommitSha,
           previousCommitWebUrl: before.previousCommitWebUrl,
           previousCommitMessage: before.previousCommitMessage,
+          previousCommitMeta: before.previousCommitMeta,
           previousMergeRequest: before.previousMergeRequest,
           previousMergeRequestIssues: before.previousMergeRequestIssues,
           unresolvedReason: before.unresolvedReason,
@@ -514,6 +519,14 @@ export class IssueAnalyzer {
       const context: PreviousCommitContext = {
         commitWebUrl: commit.web_url ?? null,
         commitMessage: commit.message ?? null,
+        commitMeta: {
+          authorName: commit.author_name ?? null,
+          authorEmail: commit.author_email ?? null,
+          authoredAt: commit.authored_date ?? null,
+          committerName: commit.committer_name ?? null,
+          committerEmail: commit.committer_email ?? null,
+          committedAt: commit.committed_date ?? null,
+        },
         mergeRequest,
         mergeRequestIssues,
       };

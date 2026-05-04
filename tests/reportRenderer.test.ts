@@ -475,7 +475,7 @@ describe("renderHtmlReport", () => {
     expect((separatorRow.match(/>…</g) ?? []).length).toBe(7);
   });
 
-  it("renders commit message as title attribute on commit link when available", () => {
+  it("renders full commit tooltip with message and author/committer metadata", () => {
     const result = buildResult([
       {
         filePath: "src/file.ts",
@@ -496,7 +496,15 @@ describe("renderHtmlReport", () => {
                 beforeText: "before",
                 previousCommitSha: "abcdef123456abcdef123456abcdef1234567890",
                 previousCommitWebUrl: "https://gitlab.example.com/group/project/-/commit/abcdef123456",
-                previousCommitMessage: "Fix: resolve null pointer\n\nDetailed explanation here.",
+                previousCommitMessage: "Fix: resolve null pointer\n\nDetailed explanation.",
+                previousCommitMeta: {
+                  authorName: "Ada Lovelace",
+                  authorEmail: "ada@example.com",
+                  authoredAt: "2026-01-10T09:00:00.000Z",
+                  committerName: "Grace Hopper",
+                  committerEmail: "grace@example.com",
+                  committedAt: "2026-01-10T10:00:00.000Z",
+                },
                 rowKind: "paired",
               },
             ],
@@ -507,11 +515,61 @@ describe("renderHtmlReport", () => {
 
     const html = renderHtmlReport(result);
 
-    expect(html).toContain('title="Fix: resolve null pointer\n\nDetailed explanation here."');
+    expect(html).toContain("Fix: resolve null pointer");
+    expect(html).toContain("Detailed explanation.");
+    expect(html).toContain("Author: Ada Lovelace &lt;ada@example.com&gt;");
+    expect(html).toContain("Authored: 2026-01-10T09:00:00.000Z");
+    expect(html).toContain("Committer: Grace Hopper &lt;grace@example.com&gt;");
+    expect(html).toContain("Committed: 2026-01-10T10:00:00.000Z");
     expect(html).toContain('href="https://gitlab.example.com/group/project/-/commit/abcdef123456"');
   });
 
-  it("renders commit SHA without title attribute when commit message is absent", () => {
+  it("renders tooltip with only meta when message is absent", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "after",
+                beforeText: "before",
+                previousCommitSha: "abcdef123456abcdef123456abcdef1234567890",
+                previousCommitWebUrl: "https://gitlab.example.com/group/project/-/commit/abcdef123456",
+                previousCommitMeta: {
+                  authorName: "Ada Lovelace",
+                  authorEmail: null,
+                  authoredAt: "2026-01-10T09:00:00.000Z",
+                  committerName: null,
+                  committerEmail: null,
+                  committedAt: null,
+                },
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+
+    const tooltip = html.match(/title="([^"]*)"/)?.[1] ?? "";
+    expect(tooltip).toContain("Author: Ada Lovelace");
+    expect(tooltip).toContain("Authored: 2026-01-10T09:00:00.000Z");
+    expect(tooltip).not.toContain("Committer:");
+  });
+
+  it("renders commit SHA without title attribute when neither message nor meta is present", () => {
     const result = buildResult([
       {
         filePath: "src/file.ts",

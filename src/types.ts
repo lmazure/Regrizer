@@ -76,10 +76,12 @@ export interface GitLabCommitDetail {
   short_id: string;
   title: string;
   message: string;
+  author_name?: string;
+  author_email?: string;
   authored_date: string;
-  committed_date: string;
   committer_name?: string;
   committer_email?: string;
+  committed_date: string;
   parent_ids: string[];
   web_url: string;
 }
@@ -143,6 +145,18 @@ export interface LineProvenance {
 }
 
 /**
+ * Author/committer metadata for a previously introduced commit shown in the report tooltip.
+ */
+export interface PreviousCommitMeta {
+  authorName: string | null;
+  authorEmail: string | null;
+  authoredAt: string | null;
+  committerName: string | null;
+  committerEmail: string | null;
+  committedAt: string | null;
+}
+
+/**
  * A rendered line in a report, with optional provenance details.
  */
 export interface ReportLine {
@@ -151,6 +165,7 @@ export interface ReportLine {
   previousCommitSha?: string | null;
   previousCommitWebUrl?: string | null;
   previousCommitMessage?: string | null;
+  previousCommitMeta?: PreviousCommitMeta | null;
   previousMergeRequest?: GitLabMergeRequestRef | null;
   previousMergeRequestIssues?: RelatedIssueRef[];
   unresolvedReason?: string;
@@ -167,6 +182,7 @@ export interface ReportChunkRow {
   previousCommitSha?: string | null;
   previousCommitWebUrl?: string | null;
   previousCommitMessage?: string | null;
+  previousCommitMeta?: PreviousCommitMeta | null;
   previousMergeRequest?: GitLabMergeRequestRef | null;
   previousMergeRequestIssues?: RelatedIssueRef[];
   unresolvedReason?: string;

@@ -1,4 +1,4 @@
-import { AnalysisResult, ReportChunk, ReportCommit, ReportCommitFile, ReportMergeRequest } from "./types.js";
+import { AnalysisResult, PreviousCommitMeta, ReportChunk, ReportCommit, ReportCommitFile, ReportMergeRequest } from "./types.js";
 import { FileTypeConfig, resolveFileType } from "./fileTypeConfig.js";
 import { escapeHtml } from "./utils.js";
 
@@ -24,6 +24,40 @@ function buildGitLabBlameUrl(projectWebUrl: string, sha: string, filePath: strin
 
 function isSameIssueUrl(left: string, right: string): boolean {
   return normalizeIssueUrl(left) === normalizeIssueUrl(right);
+}
+
+function buildCommitTooltip(message: string | null | undefined, meta: PreviousCommitMeta | null | undefined): string {
+  const parts: string[] = [];
+
+  if (message) {
+    parts.push(message);
+  }
+
+  if (meta) {
+    const metaLines: string[] = [];
+    const authorWho = [meta.authorName, meta.authorEmail ? `<${meta.authorEmail}>` : ""].filter(Boolean).join(" ");
+    if (authorWho) {
+      metaLines.push(`Author: ${authorWho}`);
+    }
+    if (meta.authoredAt) {
+      metaLines.push(`Authored: ${meta.authoredAt}`);
+    }
+    const committerWho = [meta.committerName, meta.committerEmail ? `<${meta.committerEmail}>` : ""].filter(Boolean).join(" ");
+    if (committerWho) {
+      metaLines.push(`Committer: ${committerWho}`);
+    }
+    if (meta.committedAt) {
+      metaLines.push(`Committed: ${meta.committedAt}`);
+    }
+    if (metaLines.length > 0) {
+      if (parts.length > 0) {
+        parts.push("");
+      }
+      parts.push(...metaLines);
+    }
+  }
+
+  return parts.join("\n");
 }
 
 /**
@@ -340,8 +374,9 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
     }
 
     const row = item.row;
-    const titleAttr = row.previousCommitSha && row.previousCommitMessage
-      ? ` title="${escapeHtml(row.previousCommitMessage)}"`
+    const tooltip = buildCommitTooltip(row.previousCommitMessage, row.previousCommitMeta);
+    const titleAttr = row.previousCommitSha && tooltip
+      ? ` title="${escapeHtml(tooltip)}"`
       : "";
     return {
       html: row.previousCommitSha
