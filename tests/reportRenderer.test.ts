@@ -341,6 +341,140 @@ describe("renderHtmlReport", () => {
     expect(html).toContain(`Generated at ${first.generatedAt}`);
   });
 
+  it("renders beforeLineNumber in the before-line column and beforeText in the before-code column", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 8,
+            oldCount: 3,
+            newStart: 10,
+            newCount: 3,
+            rows: [
+              {
+                lineNumber: 10,
+                beforeLineNumber: 8,
+                afterText: "after-code",
+                beforeText: "before-code",
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+
+    expect(html).toContain('<td class="ln">10</td>');
+    expect(html).toContain('<td class="ln">8</td>');
+    expect(html).toContain("<code>after-code</code>");
+    expect(html).toContain("<code>before-code</code>");
+  });
+
+  it("renders beforeText for context rows and no beforeLineNumber when absent", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 5,
+            oldCount: 1,
+            newStart: 5,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 5,
+                afterText: "context-code",
+                beforeText: "context-code",
+                rowKind: "context",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+
+    expect(html).toContain('<td class="ln">5</td>');
+    expect(html).toContain('<td class="ln"></td>');
+    expect((html.match(/<code>context-code<\/code>/g) ?? []).length).toBe(2);
+  });
+
+  it("renders the Line column header before Code before commit", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [{ lineNumber: 1, afterText: "line", rowKind: "added" }],
+          },
+        ],
+      },
+    ]);
+    const html = renderHtmlReport(result);
+    const headerRow = html.match(/<thead>.*?<\/thead>/s)?.[0] ?? "";
+
+    expect(headerRow).toContain("Code after commit");
+    expect(headerRow).toContain("Code before commit");
+    const afterIndex = headerRow.indexOf("Code after commit");
+    const lineBeforeIndex = headerRow.lastIndexOf('<th class="ln">Line</th>');
+    const codeBeforeIndex = headerRow.indexOf("Code before commit");
+    expect(afterIndex).toBeLessThan(lineBeforeIndex);
+    expect(lineBeforeIndex).toBeLessThan(codeBeforeIndex);
+  });
+
+  it("separator row contains seven ellipsis cells", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 10,
+            oldCount: 1,
+            newStart: 10,
+            newCount: 1,
+            rows: [{ lineNumber: 10, afterText: "first", rowKind: "added" }],
+          },
+          {
+            oldStart: 30,
+            oldCount: 1,
+            newStart: 30,
+            newCount: 1,
+            rows: [{ lineNumber: 30, afterText: "second", rowKind: "added" }],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+    const separatorRow = html.match(/<tr class="row-separator">.*?<\/tr>/s)?.[0] ?? "";
+
+    expect((separatorRow.match(/>…</g) ?? []).length).toBe(7);
+  });
+
   it("keeps empty code cells at consistent height via code-table CSS", () => {
     const result = buildResult([
       {

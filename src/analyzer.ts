@@ -19,6 +19,22 @@ import {
 import { splitTextLines } from "./utils.js";
 
 /**
+ * Returns the old-side line-number offset for synthetic context lines that precede a hunk.
+ * Lines before the hunk are unchanged, so their old position equals new + (oldStart - newStart).
+ */
+export function computeContextBeforeLineOffset(oldStart: number, newStart: number): number {
+  return oldStart - newStart;
+}
+
+/**
+ * Returns the old-side line-number offset for synthetic context lines that follow a hunk.
+ * After the hunk, the accumulated delta includes the hunk's own net change.
+ */
+export function computeContextAfterLineOffset(oldStart: number, oldCount: number, newStart: number, newCount: number): number {
+  return (oldStart + oldCount) - (newStart + newCount);
+}
+
+/**
  * Resolved provenance context attached to a previously introduced commit.
  */
 interface PreviousCommitContext {
@@ -256,7 +272,9 @@ export class IssueAnalyzer {
         });
       }
 
-      const rows = this.buildChunkRows(contextBefore, hunk.entries, afterLines, beforeLines, contextAfter);
+      const contextBeforeLineOffset = computeContextBeforeLineOffset(hunk.oldStart, hunk.newStart);
+      const contextAfterLineOffset = computeContextAfterLineOffset(hunk.oldStart, hunk.oldCount, hunk.newStart, hunk.newCount);
+      const rows = this.buildChunkRows(contextBefore, hunk.entries, afterLines, beforeLines, contextAfter, contextBeforeLineOffset, contextAfterLineOffset);
 
       chunks.push({
         oldStart: hunk.oldStart,
@@ -306,12 +324,15 @@ export class IssueAnalyzer {
     afterLines: ReportLine[],
     beforeLines: ReportLine[],
     contextAfter: ReportLine[],
+    contextBeforeLineOffset = 0,
+    contextAfterLineOffset = 0,
   ): ReportChunkRow[] {
     const rows: ReportChunkRow[] = [];
 
     for (const line of contextBefore) {
       rows.push({
         lineNumber: line.lineNumber,
+        beforeLineNumber: line.lineNumber !== null ? line.lineNumber + contextBeforeLineOffset : null,
         afterText: line.text,
         beforeText: line.text,
         rowKind: "context",
@@ -411,6 +432,7 @@ export class IssueAnalyzer {
     for (const line of contextAfter) {
       rows.push({
         lineNumber: line.lineNumber,
+        beforeLineNumber: line.lineNumber !== null ? line.lineNumber + contextAfterLineOffset : null,
         afterText: line.text,
         beforeText: line.text,
         rowKind: "context",
