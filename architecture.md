@@ -155,7 +155,7 @@ When Regrizer can determine post-image file length, it also adds boundary separa
 
 Within a single hunk, unchanged lines in the middle of changes (for example a `where:` line between two modified groups) are rendered as `context` rows, not as modified rows.
 
-Each issue section title is rendered from issue data (for example, `Issue #6380 - <issue title>`) instead of generic numbering.
+Each issue section title is rendered from issue data (for example, `#6380 - <issue title>`) instead of generic numbering.
 
 For readability, repeated consecutive values in these provenance columns are rendered as merged cells (`rowspan`) within each file table:
 
