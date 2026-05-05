@@ -29,12 +29,14 @@ export function parseGitLabIssueUrl(issueUrl: string): ParsedIssueUrl {
 
 /**
  * Extracts non-empty issue URLs from newline-delimited file content.
+ * Lines whose first character is `#` are treated as comments and ignored.
  * @param content Raw file contents.
  * @returns Trimmed non-empty issue URLs.
  */
 export function parseIssueUrlsFromFileContent(content: string): string[] {
   return content
     .split(/\r?\n/)
+    .filter((line) => !line.startsWith("#"))
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 }

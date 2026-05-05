@@ -30,7 +30,7 @@ node dist/src/cli.js \
   --issue-url "https://gitlab.example.com/group/project/-/issues/456"
 ```
 
-You can also provide issue URLs from a file with `--issue-url-file` (one issue URL per line; blank lines are ignored):
+You can also provide issue URLs from a file with `--issue-url-file` (one issue URL per line; blank lines and lines starting with `#` are ignored):
 
 ```bash
 node dist/src/cli.js --issue-url-file ./issues.txt
