@@ -90,6 +90,12 @@ npm run dev -- --issue-url "https://gitlab.example.com/group/project/-/issues/12
 
 Place a `regrizer.yaml` file in the directory where you run the CLI to classify files into named types. If the file is absent, a single default type named **Files** with icon **📄** covering all files is used.
 
+Use `--conf-file` to specify a different configuration file path:
+
+```bash
+node dist/src/cli.js --issue-url "https://gitlab.example.com/group/project/-/issues/123" --conf-file /path/to/my-config.yaml
+```
+
 ```yaml
 fileTypes:
   - typeName: Production

@@ -15,6 +15,7 @@ import { loadIssueUrlsFromFile, parseGitLabIssueUrl } from "./utils.js";
 interface CliArgs {
   issueUrls: string[];
   output: string;
+  confFile: string;
   display: boolean;
   verboseLevel: number;
 }
@@ -32,13 +33,13 @@ interface FailedIssueAnalysis {
  * @param argv Process argument array.
  * @returns Parsed CLI arguments.
  */
-function parseArgs(argv: string[]): CliArgs {
+export function parseArgs(argv: string[]): CliArgs {
   const args = new Map<string, string>();
   const issueUrls: string[] = [];
   const issueUrlFiles: string[] = [];
   let verboseLevel = 0;
   let display = false;
-  const knownFlags = new Set(["issue-url", "issue-url-file", "output"]);
+  const knownFlags = new Set(["issue-url", "issue-url-file", "output", "conf-file"]);
 
   for (let index = 2; index < argv.length; index += 1) {
     const value = argv[index];
@@ -88,6 +89,7 @@ function parseArgs(argv: string[]): CliArgs {
   return {
     issueUrls,
     output: args.get("output") ?? "report.html",
+    confFile: args.get("conf-file") ?? "regrizer.yaml",
     display,
     verboseLevel,
   };
@@ -130,13 +132,13 @@ async function openReportInBrowser(filePath: string): Promise<void> {
  * @returns Promise that resolves when the report is written.
  */
 async function run(): Promise<void> {
-  const { issueUrls, output, display, verboseLevel } = parseArgs(process.argv);
+  const { issueUrls, output, confFile, display, verboseLevel } = parseArgs(process.argv);
   const token = process.env.GITLAB_TOKEN;
   if (!token) {
     throw new Error("GITLAB_TOKEN environment variable is required");
   }
 
-  const config = loadRegrizerConfig("regrizer.yaml");
+  const config = loadRegrizerConfig(confFile);
 
   const logger = new Logger(verboseLevel);
   logger.log(`Starting analysis for ${issueUrls.length} issue(s)`);
@@ -177,7 +179,7 @@ async function run(): Promise<void> {
 run().catch((error) => {
   process.stderr.write(`Error: ${(error as Error).message}\n`);
   process.stderr.write(
-    "Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--issue-url-file <file> ...] [--output report.html] [--display] [--verbose] [--verbose]\n",
+    "Usage: node dist/src/cli.js --issue-url <url> [--issue-url <url> ...] [--issue-url-file <file> ...] [--output report.html] [--conf-file regrizer.yaml] [--display] [--verbose] [--verbose]\n",
   );
   process.exitCode = 1;
 });

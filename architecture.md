@@ -2,7 +2,7 @@
 
 ## Modules
 
-- `src/cli.ts`: CLI argument parsing and orchestration. Loads `regrizer.yaml` from the current working directory via `loadRegrizerConfig` and passes the resolved file type list to the renderer.
+- `src/cli.ts`: CLI argument parsing and orchestration. Loads the configuration file (defaulting to `regrizer.yaml` in the current working directory, overridable with `--conf-file`) via `loadRegrizerConfig` and passes the resolved file type list to the renderer.
 - `src/fileTypeConfig.ts`: `regrizer.yaml` loading, validation, and file type resolution (`loadRegrizerConfig`, `resolveFileType`).
 - `src/gitlabClient.ts`: GitLab REST/GraphQL client and request helpers.
 - `src/analyzer.ts`: Analysis pipeline (issue -> MRs -> merged commit -> files -> chunks -> blame attribution). Files are emitted with placeholder file type fields; the renderer stamps the resolved values.
