@@ -586,7 +586,7 @@ function renderFileTable(
 function renderFailedIssueSection(item: FailedIssueRenderItem, index: number): string {
   return `
     <details class="issue-section issue failed-issue" open>
-      <summary><h2>Issue ${index + 1} (failed)</h2></summary>
+      <summary><h2>#${index + 1} (failed)</h2></summary>
       <div class="meta"><span class="label">Issue URL</span> <a href="${escapeHtml(item.issueUrl)}" target="_blank" rel="noopener">${escapeHtml(item.issueUrl)}</a></div>
       <div class="meta unresolved"><span class="label">Error</span> ${escapeHtml(item.errorMessage)}</div>
     </details>
@@ -696,7 +696,7 @@ function renderIssueSection(result: AnalysisResult, index: number): string {
 
   return `
     <details class="issue-section issue" open>
-      <summary><h2>Issue <a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${result.inputIssue.iid}</a> - ${escapeHtml(result.inputIssue.title)}</h2></summary>
+      <summary><h2><a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${result.inputIssue.iid}</a> - ${escapeHtml(result.inputIssue.title)}</h2></summary>
       <div class="meta"><span class="label">Project</span> <a href="${escapeHtml(result.project.web_url)}" target="_blank" rel="noopener">${escapeHtml(result.project.path_with_namespace)}</a></div>
       <div class="meta"><span class="label">Merged MRs analyzed</span> ${result.mergeRequests.length}</div>
       ${mrSections || '<div class="mr"><div class="meta">No related merged MRs found.</div></div>'}
