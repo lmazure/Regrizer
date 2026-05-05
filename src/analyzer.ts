@@ -93,6 +93,8 @@ export class IssueAnalyzer {
           authorName: this.toDisplayName(mr.author),
           assignees: (mr.assignees ?? []).map((user) => this.toDisplayName(user)),
           reviewers: (mr.reviewers ?? []).map((user) => this.toDisplayName(user)),
+          createdAt: mr.created_at ?? null,
+          mergedAt: mr.merged_at,
         },
         mergedAt: mr.merged_at,
         commits,

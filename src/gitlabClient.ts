@@ -7,6 +7,7 @@ import {
   GitLabMergeRequestRef,
   GitLabMrChange,
   GitLabProject,
+  GitLabUserRef,
   RelatedIssueRef,
 } from "./types.js";
 import { Logger } from "./logger.js";
@@ -45,8 +46,13 @@ interface MergeRequestIssuesGraphQlData {
   project: {
     mergeRequest: {
       closingIssuesReferences?: Array<{
+        iid: string;
         title: string;
         webUrl: string;
+        author?: { name?: string } | null;
+        assignees?: { nodes: Array<{ name?: string }> };
+        createdAt?: string | null;
+        closedAt?: string | null;
       }>;
     } | null;
   } | null;
@@ -289,7 +295,18 @@ export class GitLabClient {
   async getMergeRequestsForCommit(projectId: number, sha: string): Promise<GitLabMergeRequestRef[]> {
     const mergedOnly = await this.safeRequest(
       () =>
-        this.requestJson<Array<{ project_id: number; iid: number; title: string; web_url: string; state: string }>>(
+        this.requestJson<Array<{
+          project_id: number;
+          iid: number;
+          title: string;
+          web_url: string;
+          state: string;
+          author?: GitLabUserRef | null;
+          assignees?: GitLabUserRef[];
+          reviewers?: GitLabUserRef[];
+          created_at?: string;
+          merged_at?: string | null;
+        }>>(
           `/projects/${projectId}/repository/commits/${sha}/merge_requests`,
         ),
       [],
@@ -302,6 +319,11 @@ export class GitLabClient {
         iid: mr.iid,
         title: mr.title,
         webUrl: mr.web_url,
+        authorName: this.userToDisplayName(mr.author),
+        assignees: (mr.assignees ?? []).map((u) => this.userToDisplayName(u)),
+        reviewers: (mr.reviewers ?? []).map((u) => this.userToDisplayName(u)),
+        createdAt: mr.created_at ?? null,
+        mergedAt: mr.merged_at ?? null,
       }));
   }
 
@@ -312,22 +334,42 @@ export class GitLabClient {
    * @returns Related issue references.
    */
   async getIssuesClosedByMergeRequest(projectId: number, mrIid: number): Promise<RelatedIssueRef[]> {
+    type RawIssue = {
+      iid: number;
+      title: string;
+      web_url: string;
+      author?: GitLabUserRef | null;
+      assignees?: GitLabUserRef[];
+      created_at?: string;
+      closed_at?: string | null;
+    };
+
     const closesIssues = await this.safeRequest(
-      () => this.requestJson<Array<{ title: string; web_url: string }>>(`/projects/${projectId}/merge_requests/${mrIid}/closes_issues`),
+      () => this.requestJson<RawIssue[]>(`/projects/${projectId}/merge_requests/${mrIid}/closes_issues`),
       [],
     );
 
     const relatedIssues = await this.safeRequest(
-      () => this.requestJson<Array<{ title: string; web_url: string }>>(`/projects/${projectId}/merge_requests/${mrIid}/related_issues`),
+      () => this.requestJson<RawIssue[]>(`/projects/${projectId}/merge_requests/${mrIid}/related_issues`),
       [],
     );
 
+    const toRef = (issue: RawIssue): RelatedIssueRef => ({
+      iid: issue.iid,
+      title: issue.title,
+      webUrl: issue.web_url,
+      authorName: this.userToDisplayName(issue.author),
+      assignees: (issue.assignees ?? []).map((u) => this.userToDisplayName(u)),
+      createdAt: issue.created_at ?? null,
+      closedAt: issue.closed_at ?? null,
+    });
+
     const refs = new Map<string, RelatedIssueRef>();
     for (const issue of closesIssues) {
-      refs.set(issue.web_url, { title: issue.title, webUrl: issue.web_url });
+      refs.set(issue.web_url, toRef(issue));
     }
     for (const issue of relatedIssues) {
-      refs.set(issue.web_url, { title: issue.title, webUrl: issue.web_url });
+      refs.set(issue.web_url, toRef(issue));
     }
 
     if (refs.size > 0) {
@@ -397,8 +439,13 @@ export class GitLabClient {
         project(fullPath: $fullPath) {
           mergeRequest(iid: $iid) {
             closingIssuesReferences {
+              iid
               title
               webUrl
+              author { name }
+              assignees { nodes { name } }
+              createdAt
+              closedAt
             }
           }
         }
@@ -411,8 +458,13 @@ export class GitLabClient {
     });
 
     return payload.project?.mergeRequest?.closingIssuesReferences?.map((issue) => ({
+      iid: issue.iid ? Number(issue.iid) : undefined,
       title: issue.title,
       webUrl: issue.webUrl,
+      authorName: issue.author?.name ?? null,
+      assignees: (issue.assignees?.nodes ?? []).map((u) => u.name ?? "unknown"),
+      createdAt: issue.createdAt ?? null,
+      closedAt: issue.closedAt ?? null,
     })) ?? [];
   }
 
@@ -588,6 +640,10 @@ export class GitLabClient {
     } catch {
       return fallback;
     }
+  }
+
+  private userToDisplayName(user: { name?: string; username?: string } | null | undefined): string {
+    return user?.name ?? user?.username ?? "unknown";
   }
 
   /**

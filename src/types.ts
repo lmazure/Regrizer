@@ -44,6 +44,8 @@ export interface GitLabMergeRequestRef {
   authorName?: string;
   assignees?: string[];
   reviewers?: string[];
+  createdAt?: string | null;
+  mergedAt?: string | null;
 }
 
 /**
@@ -96,6 +98,7 @@ export interface GitLabMergeRequest {
   title: string;
   web_url: string;
   state: string;
+  created_at?: string;
   merged_at: string | null;
   merge_commit_sha: string | null;
   squash_commit_sha?: string | null;
@@ -124,8 +127,13 @@ export interface GitLabMrChange {
  * Lightweight issue reference related to a merge request.
  */
 export interface RelatedIssueRef {
+  iid?: number;
   title: string;
   webUrl: string;
+  authorName?: string | null;
+  assignees?: string[];
+  createdAt?: string | null;
+  closedAt?: string | null;
 }
 
 /**

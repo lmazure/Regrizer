@@ -604,6 +604,145 @@ describe("renderHtmlReport", () => {
     expect(html).not.toContain(" title=");
   });
 
+  it("renders MR tooltip with title, author, assignees, reviewers, created and merged dates", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "after",
+                beforeText: "before",
+                previousMergeRequest: {
+                  projectId: 1,
+                  iid: 42,
+                  title: "Implement feature X",
+                  webUrl: "https://gitlab.example.com/group/project/-/merge_requests/42",
+                  authorName: "Ada Lovelace",
+                  assignees: ["Grace Hopper", "Alan Turing"],
+                  reviewers: ["Barbara Liskov"],
+                  createdAt: "2026-01-01T08:00:00.000Z",
+                  mergedAt: "2026-01-05T12:00:00.000Z",
+                },
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+    const mrLink = html.match(/<a href="https:\/\/gitlab\.example\.com\/group\/project\/-\/merge_requests\/42"[^>]*>/)?.[0] ?? "";
+
+    expect(mrLink).toContain("Implement feature X");
+    expect(mrLink).toContain("Author: Ada Lovelace");
+    expect(mrLink).toContain("Assignees: Grace Hopper, Alan Turing");
+    expect(mrLink).toContain("Reviewers: Barbara Liskov");
+    expect(mrLink).toContain("Created: 2026-01-01T08:00:00.000Z");
+    expect(mrLink).toContain("Merged: 2026-01-05T12:00:00.000Z");
+  });
+
+  it("renders issue cell with #iid prefix and tooltip with author, assignees, dates", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "after",
+                beforeText: "before",
+                previousMergeRequestIssues: [
+                  {
+                    iid: 123,
+                    title: "Fix null pointer bug",
+                    webUrl: "https://gitlab.example.com/group/project/-/issues/123",
+                    authorName: "Ada Lovelace",
+                    assignees: ["Grace Hopper"],
+                    createdAt: "2026-01-02T09:00:00.000Z",
+                    closedAt: "2026-01-06T17:00:00.000Z",
+                  },
+                ],
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+
+    // The table cell link includes #iid: prefix and tooltip; the overview link uses plain title only.
+    expect(html).toContain(">#123: Fix null pointer bug<");
+    const issueTitleAttr = [...html.matchAll(/title="([^"]*)"/gs)]
+      .map((m) => m[1])
+      .find((t) => t.includes("Author: Ada Lovelace")) ?? "";
+    expect(issueTitleAttr).toContain("Author: Ada Lovelace");
+    expect(issueTitleAttr).toContain("Assignees: Grace Hopper");
+    expect(issueTitleAttr).toContain("Created: 2026-01-02T09:00:00.000Z");
+    expect(issueTitleAttr).toContain("Closed: 2026-01-06T17:00:00.000Z");
+  });
+
+  it("renders issue cell with title only when iid is absent", () => {
+    const result = buildResult([
+      {
+        filePath: "src/file.ts",
+        oldPath: "src/file.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "after",
+                beforeText: "before",
+                previousMergeRequestIssues: [
+                  {
+                    title: "Some issue without iid",
+                    webUrl: "https://gitlab.example.com/group/project/-/issues/99",
+                  },
+                ],
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+
+    expect(html).toContain(">Some issue without iid<");
+    expect(html).not.toContain("#undefined");
+  });
+
   it("keeps empty code cells at consistent height via code-table CSS", () => {
     const result = buildResult([
       {

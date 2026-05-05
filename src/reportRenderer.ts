@@ -1,4 +1,4 @@
-import { AnalysisResult, PreviousCommitMeta, ReportChunk, ReportCommit, ReportCommitFile, ReportMergeRequest } from "./types.js";
+import { AnalysisResult, GitLabMergeRequestRef, PreviousCommitMeta, RelatedIssueRef, ReportChunk, ReportCommit, ReportCommitFile, ReportMergeRequest } from "./types.js";
 import { FileTypeConfig, resolveFileType } from "./fileTypeConfig.js";
 import { escapeHtml } from "./utils.js";
 
@@ -24,6 +24,46 @@ function buildGitLabBlameUrl(projectWebUrl: string, sha: string, filePath: strin
 
 function isSameIssueUrl(left: string, right: string): boolean {
   return normalizeIssueUrl(left) === normalizeIssueUrl(right);
+}
+
+function buildMergeRequestTooltip(mr: GitLabMergeRequestRef): string {
+  const lines: string[] = [];
+  if (mr.title) {
+    lines.push(mr.title, "");
+  }
+  if (mr.authorName) {
+    lines.push(`Author: ${mr.authorName}`);
+  }
+  if (mr.assignees && mr.assignees.length > 0) {
+    lines.push(`Assignees: ${mr.assignees.join(", ")}`);
+  }
+  if (mr.reviewers && mr.reviewers.length > 0) {
+    lines.push(`Reviewers: ${mr.reviewers.join(", ")}`);
+  }
+  if (mr.createdAt) {
+    lines.push(`Created: ${mr.createdAt}`);
+  }
+  if (mr.mergedAt) {
+    lines.push(`Merged: ${mr.mergedAt}`);
+  }
+  return lines.join("\n");
+}
+
+function buildIssueTooltip(issue: RelatedIssueRef): string {
+  const lines: string[] = [];
+  if (issue.authorName) {
+    lines.push(`Author: ${issue.authorName}`);
+  }
+  if (issue.assignees && issue.assignees.length > 0) {
+    lines.push(`Assignees: ${issue.assignees.join(", ")}`);
+  }
+  if (issue.createdAt) {
+    lines.push(`Created: ${issue.createdAt}`);
+  }
+  if (issue.closedAt) {
+    lines.push(`Closed: ${issue.closedAt}`);
+  }
+  return lines.join("\n");
 }
 
 function buildCommitTooltip(message: string | null | undefined, meta: PreviousCommitMeta | null | undefined): string {
@@ -394,9 +434,12 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
     }
 
     const row = item.row;
+    const mrTitleAttr = row.previousMergeRequest
+      ? ` title="${escapeHtml(buildMergeRequestTooltip(row.previousMergeRequest))}"`
+      : "";
     return {
       html: row.previousMergeRequest
-    ? `<a href="${escapeHtml(row.previousMergeRequest.webUrl ?? "")}" target="_blank" rel="noopener">!${row.previousMergeRequest.iid}</a>`
+    ? `<a href="${escapeHtml(row.previousMergeRequest.webUrl ?? "")}"${mrTitleAttr} target="_blank" rel="noopener">!${row.previousMergeRequest.iid}</a>`
     : "",
       dimmed: includesCurrentIssue(item),
     } satisfies ProvenanceCellValue;
@@ -411,7 +454,12 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
     return {
       html: (row.previousMergeRequestIssues && row.previousMergeRequestIssues.length > 0)
     ? row.previousMergeRequestIssues
-      .map((issue) => `<a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a>`)
+      .map((issue) => {
+        const label = issue.iid !== undefined ? `#${issue.iid}: ${issue.title}` : issue.title;
+        const issueTooltip = buildIssueTooltip(issue);
+        const issueTitleAttr = issueTooltip ? ` title="${escapeHtml(issueTooltip)}"` : "";
+        return `<a href="${escapeHtml(issue.webUrl)}"${issueTitleAttr} target="_blank" rel="noopener">${escapeHtml(label)}</a>`;
+      })
       .join("<br />")
     : "",
       dimmed: includesCurrentIssue(item),
