@@ -2,14 +2,29 @@ import { AnalysisResult, GitLabMergeRequestRef, PreviousCommitMeta, RelatedIssue
 import { FileTypeConfig, resolveFileType } from "./fileTypeConfig.js";
 import { escapeHtml } from "./utils.js";
 
+/**
+ * Normalizes a GitLab issue URL for comparison by trimming whitespace, stripping trailing slashes, and lowercasing.
+ * @param url Raw issue URL.
+ * @returns Normalized URL string.
+ */
 function normalizeIssueUrl(url: string): string {
   return url.trim().replace(/\/+$/, "").toLowerCase();
 }
 
+/**
+ * Normalizes a GitLab project web URL by trimming whitespace and stripping trailing slashes.
+ * @param url Raw project web URL.
+ * @returns Normalized URL string.
+ */
 function normalizeProjectWebUrl(url: string): string {
   return url.trim().replace(/\/+$/, "");
 }
 
+/**
+ * Percent-encodes each path segment of a file path for use in GitLab URLs while preserving `/` separators.
+ * @param filePath Repository-relative file path.
+ * @returns URL-safe encoded path.
+ */
 function encodeGitLabFilePath(filePath: string): string {
   return filePath
     .split("/")
@@ -17,15 +32,33 @@ function encodeGitLabFilePath(filePath: string): string {
     .join("/");
 }
 
+/**
+ * Builds the GitLab blame page URL for a specific commit and file.
+ * @param projectWebUrl Base project web URL (e.g. `https://gitlab.com/group/repo`).
+ * @param sha Full commit SHA to blame at.
+ * @param filePath Repository-relative file path.
+ * @returns Absolute GitLab blame URL.
+ */
 function buildGitLabBlameUrl(projectWebUrl: string, sha: string, filePath: string): string {
   const base = normalizeProjectWebUrl(projectWebUrl);
   return `${base}/-/blame/${encodeURIComponent(sha)}/${encodeGitLabFilePath(filePath)}`;
 }
 
+/**
+ * Returns true if two issue URLs refer to the same issue after normalization.
+ * @param left First issue URL.
+ * @param right Second issue URL.
+ * @returns Whether the two URLs are equivalent.
+ */
 function isSameIssueUrl(left: string, right: string): boolean {
   return normalizeIssueUrl(left) === normalizeIssueUrl(right);
 }
 
+/**
+ * Builds a plain-text tooltip for a merge request cell containing its title, author, assignees, reviewers, and dates.
+ * @param mr Merge request reference to describe.
+ * @returns Newline-separated tooltip string, or empty string if no fields are available.
+ */
 function buildMergeRequestTooltip(mr: GitLabMergeRequestRef): string {
   const lines: string[] = [];
   if (mr.title) {
@@ -49,6 +82,11 @@ function buildMergeRequestTooltip(mr: GitLabMergeRequestRef): string {
   return lines.join("\n");
 }
 
+/**
+ * Builds a plain-text tooltip for a related issue cell containing its author, assignees, and dates.
+ * @param issue Related issue reference to describe.
+ * @returns Newline-separated tooltip string, or empty string if no fields are available.
+ */
 function buildIssueTooltip(issue: RelatedIssueRef): string {
   const lines: string[] = [];
   if (issue.authorName) {
@@ -66,6 +104,12 @@ function buildIssueTooltip(issue: RelatedIssueRef): string {
   return lines.join("\n");
 }
 
+/**
+ * Builds a plain-text tooltip for a commit SHA cell containing the commit message and author/committer metadata.
+ * @param message Full commit message, or null/undefined if unavailable.
+ * @param meta Author and committer metadata, or null/undefined if unavailable.
+ * @returns Newline-separated tooltip string, or empty string if neither argument provides content.
+ */
 function buildCommitTooltip(message: string | null | undefined, meta: PreviousCommitMeta | null | undefined): string {
   const parts: string[] = [];
 
