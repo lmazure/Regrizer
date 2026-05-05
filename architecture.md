@@ -109,21 +109,21 @@ For each removed line with a valid old line number:
 Then, when a previous commit SHA is found, Regrizer enriches the row for links and related metadata:
 
 - **REST** [`GET /projects/:project_id/repository/commits/:previous_commit_sha`](https://docs.gitlab.com/api/commits/#retrieve-a-commit)
-  - used to link the SHA to the commit page (`web_url`)
+  - used to link the SHA to the commit page (`web_url`) and to provide the commit message, author name, author email, author date, committer name, committer email, and committer date for the hover tooltip
 - **REST** [`GET /projects/:project_id/repository/commits/:previous_commit_sha/merge_requests`](https://docs.gitlab.com/api/commits/#list-merge-requests-associated-with-a-commit)
-  - used to resolve a related merged MR for the commit
+  - used to resolve a related merged MR for the commit; captures title, author, assignees, reviewers, creation date, and merge date for the hover tooltip
 - **REST** [`GET /projects/:mr_project_id/merge_requests/:mr_iid/closes_issues`](https://docs.gitlab.com/api/merge_requests/#list-issues-that-close-on-merge)
-  - used to list issues closed by the MR
+  - used to list issues closed by the MR; captures iid, author, assignees, creation date, and close date for the hover tooltip
 - **REST** [`GET /projects/:mr_project_id/merge_requests/:mr_iid/related_issues`](https://docs.gitlab.com/api/merge_requests/#list-issues-related-to-the-merge-request)
-  - used to list issues related to the MR
+  - used to list issues related to the MR; same fields captured as above
 
 Issues from both endpoints are merged and deduplicated (with existing [GraphQL](https://docs.gitlab.com/api/graphql/) fallback for `closes_issues` if needed).
 
 Rows with old-side (`-`) lines include:
 
-- previous commit (short SHA hyperlink)
-- merge request hyperlink (if found)
-- related issue hyperlinks (if found)
+- previous commit (short SHA hyperlink, with tooltip showing commit message and author/committer metadata)
+- merge request hyperlink (if found), with tooltip showing title, author, assignees, reviewers, and dates
+- related issue hyperlinks (if found), each labelled `#iid: title` and with tooltip showing author, assignees, and dates
 
 When related issues on a row include the currently analyzed issue, the renderer marks all three provenance columns for that row group (previous commit, merge request, related issues) with reduced visual emphasis.
 
@@ -162,6 +162,12 @@ For readability, repeated consecutive values in these provenance columns are ren
 - previous commit
 - merge request
 - related issues
+
+Each provenance cell carries a native browser tooltip (`title` attribute):
+
+- **Previous commit**: full commit message, then author name/email/date and committer name/email/date, separated by a blank line.
+- **Merge request**: MR title (if available), then a blank line, followed by author, assignees, reviewers, creation date, and merge date.
+- **Related issue**: author, assignees, creation date, and close date. The link text is formatted as `#iid: title` when the issue IID is known.
 
 When related issues on a row include the currently analyzed issue, the renderer marks all three provenance columns for that row group with reduced visual emphasis.
 

@@ -151,6 +151,9 @@ The report hierarchy is:
    - when a row's related issues include the currently analyzed issue, those three provenance cells are rendered with reduced emphasis
    - unchanged rows fill line number, code-after, line-number-before, and code-before columns (the code is identical before and after; the before line number is shown for context rows within a diff hunk)
    - changed rows fill before/provenance columns when applicable
+   - hovering over a **previous commit** cell shows a tooltip with the full commit message followed by author name, author email, author date, committer name, committer email, and committer date
+   - hovering over a **merge request** cell shows a tooltip with the MR title, author, assignees, reviewers, creation date, and merge date
+   - hovering over a **related issue** cell shows a tooltip with the issue author, assignees, creation date, and close date; the cell label is formatted as `#iid: title` when the issue IID is available
 7. Every hierarchy level (MR, commit, file) is collapsible and expanded by default when the report opens
 8. Each commit section shows one compact metadata line with commit timestamp and committer identity (`Name <email>`) when available
 9. Each merge request section shows a `Project` line (from the MR's own project, which may differ from the input issue project) plus merged timestamp, author, assignees, and reviewers metadata
