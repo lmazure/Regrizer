@@ -46,6 +46,28 @@ describe("issue URL file helpers", () => {
     ]);
   });
 
+  it("ignores comment lines starting with #", () => {
+    const parsed = parseIssueUrlsFromFileContent(
+      "# team-a issues\nhttps://gitlab.example.com/group/project/-/issues/1\n# team-b issues\nhttps://gitlab.example.com/group/project/-/issues/2\n",
+    );
+
+    expect(parsed).toEqual([
+      "https://gitlab.example.com/group/project/-/issues/1",
+      "https://gitlab.example.com/group/project/-/issues/2",
+    ]);
+  });
+
+  it("does not treat a line with # not in first column as a comment", () => {
+    const parsed = parseIssueUrlsFromFileContent(
+      " # indented\nhttps://gitlab.example.com/group/project/-/issues/3\n",
+    );
+
+    expect(parsed).toEqual([
+      "# indented",
+      "https://gitlab.example.com/group/project/-/issues/3",
+    ]);
+  });
+
   it("loads issue URLs from file", () => {
     const tempDir = mkdtempSync(join(tmpdir(), "regrizer-"));
     const filePath = join(tempDir, "issues.txt");
