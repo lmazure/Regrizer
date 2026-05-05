@@ -8,6 +8,7 @@ import {
   GitLabMergeRequest,
   GitLabMergeRequestRef,
   ParsedIssueUrl,
+  PreviousCommitMeta,
   RelatedIssueRef,
   ReportChunk,
   ReportChunkRow,
@@ -19,10 +20,28 @@ import {
 import { splitTextLines } from "./utils.js";
 
 /**
+ * Returns the old-side line-number offset for synthetic context lines that precede a hunk.
+ * Lines before the hunk are unchanged, so their old position equals new + (oldStart - newStart).
+ */
+export function computeContextBeforeLineOffset(oldStart: number, newStart: number): number {
+  return oldStart - newStart;
+}
+
+/**
+ * Returns the old-side line-number offset for synthetic context lines that follow a hunk.
+ * After the hunk, the accumulated delta includes the hunk's own net change.
+ */
+export function computeContextAfterLineOffset(oldStart: number, oldCount: number, newStart: number, newCount: number): number {
+  return (oldStart + oldCount) - (newStart + newCount);
+}
+
+/**
  * Resolved provenance context attached to a previously introduced commit.
  */
 interface PreviousCommitContext {
   commitWebUrl: string | null;
+  commitMessage: string | null;
+  commitMeta: PreviousCommitMeta | null;
   mergeRequest: GitLabMergeRequestRef | null;
   mergeRequestIssues: RelatedIssueRef[];
 }
@@ -74,6 +93,8 @@ export class IssueAnalyzer {
           authorName: this.toDisplayName(mr.author),
           assignees: (mr.assignees ?? []).map((user) => this.toDisplayName(user)),
           reviewers: (mr.reviewers ?? []).map((user) => this.toDisplayName(user)),
+          createdAt: mr.created_at ?? null,
+          mergedAt: mr.merged_at,
         },
         mergedAt: mr.merged_at,
         commits,
@@ -250,13 +271,17 @@ export class IssueAnalyzer {
           text,
           previousCommitSha,
           previousCommitWebUrl: previousContext?.commitWebUrl ?? null,
+          previousCommitMessage: previousContext?.commitMessage ?? null,
+          previousCommitMeta: previousContext?.commitMeta ?? null,
           previousMergeRequest: previousContext?.mergeRequest ?? null,
           previousMergeRequestIssues: previousContext?.mergeRequestIssues ?? [],
           unresolvedReason: previousCommitSha ? undefined : "Blame did not return a commit",
         });
       }
 
-      const rows = this.buildChunkRows(contextBefore, hunk.entries, afterLines, beforeLines, contextAfter);
+      const contextBeforeLineOffset = computeContextBeforeLineOffset(hunk.oldStart, hunk.newStart);
+      const contextAfterLineOffset = computeContextAfterLineOffset(hunk.oldStart, hunk.oldCount, hunk.newStart, hunk.newCount);
+      const rows = this.buildChunkRows(contextBefore, hunk.entries, afterLines, beforeLines, contextAfter, contextBeforeLineOffset, contextAfterLineOffset);
 
       chunks.push({
         oldStart: hunk.oldStart,
@@ -306,13 +331,17 @@ export class IssueAnalyzer {
     afterLines: ReportLine[],
     beforeLines: ReportLine[],
     contextAfter: ReportLine[],
+    contextBeforeLineOffset = 0,
+    contextAfterLineOffset = 0,
   ): ReportChunkRow[] {
     const rows: ReportChunkRow[] = [];
 
     for (const line of contextBefore) {
       rows.push({
         lineNumber: line.lineNumber,
+        beforeLineNumber: line.lineNumber !== null ? line.lineNumber + contextBeforeLineOffset : null,
         afterText: line.text,
+        beforeText: line.text,
         rowKind: "context",
       });
     }
@@ -329,10 +358,13 @@ export class IssueAnalyzer {
         const before = pendingBefore[i];
         rows.push({
           lineNumber: after.lineNumber,
+          beforeLineNumber: before.lineNumber,
           afterText: after.text,
           beforeText: before.text,
           previousCommitSha: before.previousCommitSha,
           previousCommitWebUrl: before.previousCommitWebUrl,
+          previousCommitMessage: before.previousCommitMessage,
+          previousCommitMeta: before.previousCommitMeta,
           previousMergeRequest: before.previousMergeRequest,
           previousMergeRequestIssues: before.previousMergeRequestIssues,
           unresolvedReason: before.unresolvedReason,
@@ -353,10 +385,13 @@ export class IssueAnalyzer {
         const before = pendingBefore[i];
         rows.push({
           lineNumber: null,
+          beforeLineNumber: before.lineNumber,
           afterText: "",
           beforeText: before.text,
           previousCommitSha: before.previousCommitSha,
           previousCommitWebUrl: before.previousCommitWebUrl,
+          previousCommitMessage: before.previousCommitMessage,
+          previousCommitMeta: before.previousCommitMeta,
           previousMergeRequest: before.previousMergeRequest,
           previousMergeRequestIssues: before.previousMergeRequestIssues,
           unresolvedReason: before.unresolvedReason,
@@ -373,7 +408,9 @@ export class IssueAnalyzer {
         flushPendingChanges();
         rows.push({
           lineNumber: entry.newLineNumber,
+          beforeLineNumber: entry.oldLineNumber,
           afterText: entry.text,
+          beforeText: entry.text,
           rowKind: "context",
         });
         continue;
@@ -406,7 +443,9 @@ export class IssueAnalyzer {
     for (const line of contextAfter) {
       rows.push({
         lineNumber: line.lineNumber,
+        beforeLineNumber: line.lineNumber !== null ? line.lineNumber + contextAfterLineOffset : null,
         afterText: line.text,
+        beforeText: line.text,
         rowKind: "context",
       });
     }
@@ -481,6 +520,15 @@ export class IssueAnalyzer {
 
       const context: PreviousCommitContext = {
         commitWebUrl: commit.web_url ?? null,
+        commitMessage: commit.message ?? null,
+        commitMeta: {
+          authorName: commit.author_name ?? null,
+          authorEmail: commit.author_email ?? null,
+          authoredAt: commit.authored_date ?? null,
+          committerName: commit.committer_name ?? null,
+          committerEmail: commit.committer_email ?? null,
+          committedAt: commit.committed_date ?? null,
+        },
         mergeRequest,
         mergeRequestIssues,
       };

@@ -44,6 +44,8 @@ export interface GitLabMergeRequestRef {
   authorName?: string;
   assignees?: string[];
   reviewers?: string[];
+  createdAt?: string | null;
+  mergedAt?: string | null;
 }
 
 /**
@@ -76,10 +78,12 @@ export interface GitLabCommitDetail {
   short_id: string;
   title: string;
   message: string;
+  author_name?: string;
+  author_email?: string;
   authored_date: string;
-  committed_date: string;
   committer_name?: string;
   committer_email?: string;
+  committed_date: string;
   parent_ids: string[];
   web_url: string;
 }
@@ -94,6 +98,7 @@ export interface GitLabMergeRequest {
   title: string;
   web_url: string;
   state: string;
+  created_at?: string;
   merged_at: string | null;
   merge_commit_sha: string | null;
   squash_commit_sha?: string | null;
@@ -122,8 +127,13 @@ export interface GitLabMrChange {
  * Lightweight issue reference related to a merge request.
  */
 export interface RelatedIssueRef {
+  iid?: number;
   title: string;
   webUrl: string;
+  authorName?: string | null;
+  assignees?: string[];
+  createdAt?: string | null;
+  closedAt?: string | null;
 }
 
 /**
@@ -143,6 +153,18 @@ export interface LineProvenance {
 }
 
 /**
+ * Author/committer metadata for a previously introduced commit shown in the report tooltip.
+ */
+export interface PreviousCommitMeta {
+  authorName: string | null;
+  authorEmail: string | null;
+  authoredAt: string | null;
+  committerName: string | null;
+  committerEmail: string | null;
+  committedAt: string | null;
+}
+
+/**
  * A rendered line in a report, with optional provenance details.
  */
 export interface ReportLine {
@@ -150,6 +172,8 @@ export interface ReportLine {
   text: string;
   previousCommitSha?: string | null;
   previousCommitWebUrl?: string | null;
+  previousCommitMessage?: string | null;
+  previousCommitMeta?: PreviousCommitMeta | null;
   previousMergeRequest?: GitLabMergeRequestRef | null;
   previousMergeRequestIssues?: RelatedIssueRef[];
   unresolvedReason?: string;
@@ -160,10 +184,13 @@ export interface ReportLine {
  */
 export interface ReportChunkRow {
   lineNumber: number | null;
+  beforeLineNumber?: number | null;
   afterText: string;
   beforeText?: string;
   previousCommitSha?: string | null;
   previousCommitWebUrl?: string | null;
+  previousCommitMessage?: string | null;
+  previousCommitMeta?: PreviousCommitMeta | null;
   previousMergeRequest?: GitLabMergeRequestRef | null;
   previousMergeRequestIssues?: RelatedIssueRef[];
   unresolvedReason?: string;

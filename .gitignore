@@ -8,3 +8,5 @@ dist/
 *.yaml
 # ignore secret files
 .env
+# ignore Claude local settings
+**/settings.local.json

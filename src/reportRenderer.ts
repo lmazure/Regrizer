@@ -1,15 +1,30 @@
-import { AnalysisResult, ReportChunk, ReportCommit, ReportCommitFile, ReportMergeRequest } from "./types.js";
+import { AnalysisResult, GitLabMergeRequestRef, PreviousCommitMeta, RelatedIssueRef, ReportChunk, ReportCommit, ReportCommitFile, ReportMergeRequest } from "./types.js";
 import { FileTypeConfig, resolveFileType } from "./fileTypeConfig.js";
 import { escapeHtml } from "./utils.js";
 
+/**
+ * Normalizes a GitLab issue URL for comparison by trimming whitespace, stripping trailing slashes, and lowercasing.
+ * @param url Raw issue URL.
+ * @returns Normalized URL string.
+ */
 function normalizeIssueUrl(url: string): string {
   return url.trim().replace(/\/+$/, "").toLowerCase();
 }
 
+/**
+ * Normalizes a GitLab project web URL by trimming whitespace and stripping trailing slashes.
+ * @param url Raw project web URL.
+ * @returns Normalized URL string.
+ */
 function normalizeProjectWebUrl(url: string): string {
   return url.trim().replace(/\/+$/, "");
 }
 
+/**
+ * Percent-encodes each path segment of a file path for use in GitLab URLs while preserving `/` separators.
+ * @param filePath Repository-relative file path.
+ * @returns URL-safe encoded path.
+ */
 function encodeGitLabFilePath(filePath: string): string {
   return filePath
     .split("/")
@@ -17,13 +32,116 @@ function encodeGitLabFilePath(filePath: string): string {
     .join("/");
 }
 
+/**
+ * Builds the GitLab blame page URL for a specific commit and file.
+ * @param projectWebUrl Base project web URL (e.g. `https://gitlab.com/group/repo`).
+ * @param sha Full commit SHA to blame at.
+ * @param filePath Repository-relative file path.
+ * @returns Absolute GitLab blame URL.
+ */
 function buildGitLabBlameUrl(projectWebUrl: string, sha: string, filePath: string): string {
   const base = normalizeProjectWebUrl(projectWebUrl);
   return `${base}/-/blame/${encodeURIComponent(sha)}/${encodeGitLabFilePath(filePath)}`;
 }
 
+/**
+ * Returns true if two issue URLs refer to the same issue after normalization.
+ * @param left First issue URL.
+ * @param right Second issue URL.
+ * @returns Whether the two URLs are equivalent.
+ */
 function isSameIssueUrl(left: string, right: string): boolean {
   return normalizeIssueUrl(left) === normalizeIssueUrl(right);
+}
+
+/**
+ * Builds a plain-text tooltip for a merge request cell containing its title, author, assignees, reviewers, and dates.
+ * @param mr Merge request reference to describe.
+ * @returns Newline-separated tooltip string, or empty string if no fields are available.
+ */
+function buildMergeRequestTooltip(mr: GitLabMergeRequestRef): string {
+  const lines: string[] = [];
+  if (mr.title) {
+    lines.push(mr.title, "");
+  }
+  if (mr.authorName) {
+    lines.push(`Author: ${mr.authorName}`);
+  }
+  if (mr.assignees && mr.assignees.length > 0) {
+    lines.push(`Assignees: ${mr.assignees.join(", ")}`);
+  }
+  if (mr.reviewers && mr.reviewers.length > 0) {
+    lines.push(`Reviewers: ${mr.reviewers.join(", ")}`);
+  }
+  if (mr.createdAt) {
+    lines.push(`Created: ${mr.createdAt}`);
+  }
+  if (mr.mergedAt) {
+    lines.push(`Merged: ${mr.mergedAt}`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Builds a plain-text tooltip for a related issue cell containing its author, assignees, and dates.
+ * @param issue Related issue reference to describe.
+ * @returns Newline-separated tooltip string, or empty string if no fields are available.
+ */
+function buildIssueTooltip(issue: RelatedIssueRef): string {
+  const lines: string[] = [];
+  if (issue.authorName) {
+    lines.push(`Author: ${issue.authorName}`);
+  }
+  if (issue.assignees && issue.assignees.length > 0) {
+    lines.push(`Assignees: ${issue.assignees.join(", ")}`);
+  }
+  if (issue.createdAt) {
+    lines.push(`Created: ${issue.createdAt}`);
+  }
+  if (issue.closedAt) {
+    lines.push(`Closed: ${issue.closedAt}`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Builds a plain-text tooltip for a commit SHA cell containing the commit message and author/committer metadata.
+ * @param message Full commit message, or null/undefined if unavailable.
+ * @param meta Author and committer metadata, or null/undefined if unavailable.
+ * @returns Newline-separated tooltip string, or empty string if neither argument provides content.
+ */
+function buildCommitTooltip(message: string | null | undefined, meta: PreviousCommitMeta | null | undefined): string {
+  const parts: string[] = [];
+
+  if (message) {
+    parts.push(message);
+  }
+
+  if (meta) {
+    const metaLines: string[] = [];
+    const authorWho = [meta.authorName, meta.authorEmail ? `<${meta.authorEmail}>` : ""].filter(Boolean).join(" ");
+    if (authorWho) {
+      metaLines.push(`Author: ${authorWho}`);
+    }
+    if (meta.authoredAt) {
+      metaLines.push(`Authored: ${meta.authoredAt}`);
+    }
+    const committerWho = [meta.committerName, meta.committerEmail ? `<${meta.committerEmail}>` : ""].filter(Boolean).join(" ");
+    if (committerWho) {
+      metaLines.push(`Committer: ${committerWho}`);
+    }
+    if (meta.committedAt) {
+      metaLines.push(`Committed: ${meta.committedAt}`);
+    }
+    if (metaLines.length > 0) {
+      if (parts.length > 0) {
+        parts.push("");
+      }
+      parts.push(...metaLines);
+    }
+  }
+
+  return parts.join("\n");
 }
 
 /**
@@ -340,11 +458,15 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
     }
 
     const row = item.row;
+    const tooltip = buildCommitTooltip(row.previousCommitMessage, row.previousCommitMeta);
+    const titleAttr = row.previousCommitSha && tooltip
+      ? ` title="${escapeHtml(tooltip)}"`
+      : "";
     return {
       html: row.previousCommitSha
     ? (row.previousCommitWebUrl
-      ? `<a href="${escapeHtml(row.previousCommitWebUrl)}" target="_blank" rel="noopener"><code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code></a>`
-      : `<code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code>`)
+      ? `<a href="${escapeHtml(row.previousCommitWebUrl)}"${titleAttr} target="_blank" rel="noopener"><code>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code></a>`
+      : `<code${titleAttr}>${escapeHtml(row.previousCommitSha.slice(0, 12))}</code>`)
     : (row.unresolvedReason ? `<span class="unresolved">${escapeHtml(row.unresolvedReason)}</span>` : ""),
       dimmed: includesCurrentIssue(item),
     } satisfies ProvenanceCellValue;
@@ -356,9 +478,12 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
     }
 
     const row = item.row;
+    const mrTitleAttr = row.previousMergeRequest
+      ? ` title="${escapeHtml(buildMergeRequestTooltip(row.previousMergeRequest))}"`
+      : "";
     return {
       html: row.previousMergeRequest
-    ? `<a href="${escapeHtml(row.previousMergeRequest.webUrl ?? "")}" target="_blank" rel="noopener">!${row.previousMergeRequest.iid}</a>`
+    ? `<a href="${escapeHtml(row.previousMergeRequest.webUrl ?? "")}"${mrTitleAttr} target="_blank" rel="noopener">!${row.previousMergeRequest.iid}</a>`
     : "",
       dimmed: includesCurrentIssue(item),
     } satisfies ProvenanceCellValue;
@@ -373,7 +498,12 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
     return {
       html: (row.previousMergeRequestIssues && row.previousMergeRequestIssues.length > 0)
     ? row.previousMergeRequestIssues
-      .map((issue) => `<a href="${escapeHtml(issue.webUrl)}" target="_blank" rel="noopener">${escapeHtml(issue.title)}</a>`)
+      .map((issue) => {
+        const label = issue.iid !== undefined ? `#${issue.iid}: ${issue.title}` : issue.title;
+        const issueTooltip = buildIssueTooltip(issue);
+        const issueTitleAttr = issueTooltip ? ` title="${escapeHtml(issueTooltip)}"` : "";
+        return `<a href="${escapeHtml(issue.webUrl)}"${issueTitleAttr} target="_blank" rel="noopener">${escapeHtml(label)}</a>`;
+      })
       .join("<br />")
     : "",
       dimmed: includesCurrentIssue(item),
@@ -396,7 +526,7 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
   return rows
     .map((item, index) => {
       if (item.kind === "separator") {
-        return "<tr class=\"row-separator\"><td class=\"ln\">…</td><td>…</td><td>…</td><td class=\"provenance provenance-commit\">…</td><td class=\"provenance provenance-mr\">…</td><td class=\"provenance provenance-issues\">…</td></tr>";
+        return "<tr class=\"row-separator\"><td class=\"ln\">…</td><td>…</td><td class=\"ln\">…</td><td>…</td><td class=\"provenance provenance-commit\">…</td><td class=\"provenance provenance-mr\">…</td><td class=\"provenance provenance-issues\">…</td></tr>";
       }
 
       const row = item.row;
@@ -413,7 +543,7 @@ function renderCommitTableRows(rows: CommitTableRow[], currentIssueUrl: string):
         ? `<td class="provenance provenance-issues${issuesValue?.dimmed ? " provenance-dimmed" : ""}" rowspan="${getRowSpan(issuesValues, index)}">${issuesValue?.html ?? ""}</td>`
         : "";
 
-      return `<tr class="row-${row.rowKind}"><td class="ln">${row.lineNumber ?? ""}</td><td><code>${escapeHtml(row.afterText)}</code></td><td><code>${escapeHtml(row.beforeText ?? "")}</code></td>${commitCell}${mrCell}${issuesCell}</tr>`;
+      return `<tr class="row-${row.rowKind}"><td class="ln">${row.lineNumber ?? ""}</td><td><code>${escapeHtml(row.afterText)}</code></td><td class="ln">${row.beforeLineNumber ?? ""}</td><td><code>${escapeHtml(row.beforeText ?? "")}</code></td>${commitCell}${mrCell}${issuesCell}</tr>`;
     })
     .join("\n");
 }
@@ -441,7 +571,7 @@ function renderFileTable(
 
   return `
     <table class="code-table">
-      <thead><tr><th class="ln">Line</th><th>${codeAfterHeader}</th><th>${codeBeforeHeader}</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
+      <thead><tr><th class="ln">Line</th><th>${codeAfterHeader}</th><th class="ln">Line</th><th>${codeBeforeHeader}</th><th>Previous commit</th><th>Merge request</th><th>Related issues</th></tr></thead>
       <tbody>${rows || ""}</tbody>
     </table>
   `;
@@ -456,7 +586,7 @@ function renderFileTable(
 function renderFailedIssueSection(item: FailedIssueRenderItem, index: number): string {
   return `
     <details class="issue-section issue failed-issue" open>
-      <summary><h2>Issue ${index + 1} (failed)</h2></summary>
+      <summary><h2>#${index + 1} (failed)</h2></summary>
       <div class="meta"><span class="label">Issue URL</span> <a href="${escapeHtml(item.issueUrl)}" target="_blank" rel="noopener">${escapeHtml(item.issueUrl)}</a></div>
       <div class="meta unresolved"><span class="label">Error</span> ${escapeHtml(item.errorMessage)}</div>
     </details>
@@ -566,7 +696,7 @@ function renderIssueSection(result: AnalysisResult, index: number): string {
 
   return `
     <details class="issue-section issue" open>
-      <summary><h2>Issue <a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${result.inputIssue.iid}</a> - ${escapeHtml(result.inputIssue.title)}</h2></summary>
+      <summary><h2><a href="${escapeHtml(result.inputIssue.web_url)}" target="_blank" rel="noopener">#${result.inputIssue.iid}</a> - ${escapeHtml(result.inputIssue.title)}</h2></summary>
       <div class="meta"><span class="label">Project</span> <a href="${escapeHtml(result.project.web_url)}" target="_blank" rel="noopener">${escapeHtml(result.project.path_with_namespace)}</a></div>
       <div class="meta"><span class="label">Merged MRs analyzed</span> ${result.mergeRequests.length}</div>
       ${mrSections || '<div class="mr"><div class="meta">No related merged MRs found.</div></div>'}
@@ -696,10 +826,10 @@ export function renderHtmlReports(
       .code-table td, .code-table th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; white-space: nowrap; line-height: 1.4; }
       .ln { width: 70px; color: var(--muted); text-align: right; }
       .code-table th:nth-child(2), .code-table td:nth-child(2) { min-width: 520px; }
-      .code-table th:nth-child(3), .code-table td:nth-child(3) { min-width: 520px; }
-      .code-table th:nth-child(4), .code-table td:nth-child(4) { min-width: 150px; }
-      .code-table th:nth-child(5), .code-table td:nth-child(5) { min-width: 120px; }
-      .code-table th:nth-child(6), .code-table td:nth-child(6) { min-width: 420px; }
+      .code-table th:nth-child(4), .code-table td:nth-child(4) { min-width: 520px; }
+      .code-table th:nth-child(5), .code-table td:nth-child(5) { min-width: 150px; }
+      .code-table th:nth-child(6), .code-table td:nth-child(6) { min-width: 120px; }
+      .code-table th:nth-child(7), .code-table td:nth-child(7) { min-width: 420px; }
       tr.row-added td { background: var(--after); }
       tr.row-removed td { background: var(--before); }
       tr.row-paired td { background: var(--paired); }
