@@ -1,8 +1,8 @@
 # Regrizer
 
-Given a GitLab issue that fixes a bug, Regrizer identifies which earlier changes introduced it.
+Given some GitLab issues that fix bugs, Regrizer identifies which earlier changes introduced those bugs.
 
-The algorithm is straightforward: given the URL of a GitLab issue fixing a bug, it determines the GitLab issues that introduced the code lines changed by the bug correction.
+The algorithm is straightforward: given the URLs of some GitLab issues that fix bugs, it determines the GitLab issues that introduced the code lines changed by those bug corrections.
 
 ## Requirements
 
