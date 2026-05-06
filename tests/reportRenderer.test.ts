@@ -237,7 +237,7 @@ describe("renderHtmlReport", () => {
     expect(html).toMatch(/<tr class="row-separator">[\s\S]*<\/tr>\s*<\/tbody>/);
   });
 
-  it("filters the currently analyzed issue from overview origin-issue cells", () => {
+  it("filters the currently analyzed issue from overview rows", () => {
     const result = buildResult([
       {
         filePath: "src/origin.ts",
@@ -281,6 +281,207 @@ describe("renderHtmlReport", () => {
 
     expect(overviewSection).not.toContain("CURRENT_ORIGIN_SHOULD_HIDE");
     expect(overviewSection).toContain("OTHER_ORIGIN_SHOULD_REMAIN");
+  });
+
+  it("renders overview table with -n/p counts per origin issue and file column", () => {
+    const result = buildResult([
+      {
+        filePath: "src/feature.ts",
+        oldPath: "src/feature.ts",
+        fileTypeName: "Production",
+        fileTypeIcon: "🏭",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 3,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "modified-line",
+                beforeText: "modified-line-old",
+                previousCommitSha: "1111111111111111111111111111111111111111",
+                previousMergeRequestIssues: [
+                  { iid: 42, title: "Origin issue A", webUrl: "https://gitlab.example.com/group/project/-/issues/42" },
+                ],
+                rowKind: "paired",
+              },
+              {
+                lineNumber: null,
+                afterText: "",
+                beforeText: "deleted-line-1",
+                previousCommitSha: "2222222222222222222222222222222222222222",
+                previousMergeRequestIssues: [
+                  { iid: 42, title: "Origin issue A", webUrl: "https://gitlab.example.com/group/project/-/issues/42" },
+                ],
+                rowKind: "removed",
+              },
+              {
+                lineNumber: null,
+                afterText: "",
+                beforeText: "deleted-line-2",
+                previousCommitSha: "2222222222222222222222222222222222222222",
+                previousMergeRequestIssues: [
+                  { iid: 42, title: "Origin issue A", webUrl: "https://gitlab.example.com/group/project/-/issues/42" },
+                ],
+                rowKind: "removed",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReports([result], [], {
+      fileTypes: [
+        { typeName: "Production", icon: "🏭", displayOrder: 1, projectPathGlobs: [], filePathGlobs: ["src/**"] },
+        { typeName: "Files", icon: "📄", displayOrder: 99, projectPathGlobs: [], filePathGlobs: [] },
+      ],
+    });
+    const overviewSection = html.match(/<section class="overview">[\s\S]*?<\/section>/)?.[0] ?? "";
+
+    expect(overviewSection).toContain('<table class="overview-table">');
+    expect(overviewSection).toContain("🏭");
+    expect(overviewSection).toContain('class="overview-filename-rotated">src/feature.ts</span>');
+    expect(overviewSection).toContain("#42: Origin issue A");
+    expect(overviewSection).toContain(">-2/1<");
+  });
+
+  it("sorts overview rows by most recent merged_at of the origin MR (desc)", () => {
+    const result = buildResult([
+      {
+        filePath: "src/feature.ts",
+        oldPath: "src/feature.ts",
+        fileTypeName: "Files",
+        fileTypeIcon: "📄",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 2,
+            newStart: 1,
+            newCount: 2,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "a-after",
+                beforeText: "a-before",
+                previousMergeRequest: {
+                  projectId: 1,
+                  iid: 100,
+                  title: "Older MR",
+                  webUrl: "https://gitlab.example.com/group/project/-/merge_requests/100",
+                  mergedAt: "2025-01-01T00:00:00.000Z",
+                },
+                previousMergeRequestIssues: [
+                  { iid: 1, title: "Older origin", webUrl: "https://gitlab.example.com/group/project/-/issues/1" },
+                ],
+                rowKind: "paired",
+              },
+              {
+                lineNumber: 2,
+                afterText: "b-after",
+                beforeText: "b-before",
+                previousMergeRequest: {
+                  projectId: 1,
+                  iid: 200,
+                  title: "Newer MR",
+                  webUrl: "https://gitlab.example.com/group/project/-/merge_requests/200",
+                  mergedAt: "2026-01-01T00:00:00.000Z",
+                },
+                previousMergeRequestIssues: [
+                  { iid: 2, title: "Newer origin", webUrl: "https://gitlab.example.com/group/project/-/issues/2" },
+                ],
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReport(result);
+    const overviewSection = html.match(/<section class="overview">[\s\S]*?<\/section>/)?.[0] ?? "";
+    const newerIndex = overviewSection.indexOf("Newer origin");
+    const olderIndex = overviewSection.indexOf("Older origin");
+
+    expect(newerIndex).toBeGreaterThan(0);
+    expect(olderIndex).toBeGreaterThan(0);
+    expect(newerIndex).toBeLessThan(olderIndex);
+  });
+
+  it("sorts overview columns by file type displayOrder", () => {
+    const result = buildResult([
+      {
+        filePath: "tests/feature.test.ts",
+        oldPath: "tests/feature.test.ts",
+        fileTypeName: "Tests",
+        fileTypeIcon: "🧪",
+        fileTypeDisplayOrder: 2,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "t-after",
+                beforeText: "t-before",
+                previousMergeRequestIssues: [
+                  { iid: 7, title: "Origin", webUrl: "https://gitlab.example.com/group/project/-/issues/7" },
+                ],
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        filePath: "src/feature.ts",
+        oldPath: "src/feature.ts",
+        fileTypeName: "Production",
+        fileTypeIcon: "🏭",
+        fileTypeDisplayOrder: 1,
+        chunks: [
+          {
+            oldStart: 1,
+            oldCount: 1,
+            newStart: 1,
+            newCount: 1,
+            rows: [
+              {
+                lineNumber: 1,
+                afterText: "p-after",
+                beforeText: "p-before",
+                previousMergeRequestIssues: [
+                  { iid: 7, title: "Origin", webUrl: "https://gitlab.example.com/group/project/-/issues/7" },
+                ],
+                rowKind: "paired",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const html = renderHtmlReports([result], [], {
+      fileTypes: [
+        { typeName: "Production", icon: "🏭", displayOrder: 1, projectPathGlobs: [], filePathGlobs: ["src/**"] },
+        { typeName: "Tests", icon: "🧪", displayOrder: 2, projectPathGlobs: [], filePathGlobs: ["tests/**"] },
+        { typeName: "Files", icon: "📄", displayOrder: 99, projectPathGlobs: [], filePathGlobs: [] },
+      ],
+    });
+    const overviewSection = html.match(/<section class="overview">[\s\S]*?<\/section>/)?.[0] ?? "";
+    const productionIndex = overviewSection.indexOf("src/feature.ts");
+    const testsIndex = overviewSection.indexOf("tests/feature.test.ts");
+
+    expect(productionIndex).toBeGreaterThan(0);
+    expect(testsIndex).toBeGreaterThan(0);
+    expect(productionIndex).toBeLessThan(testsIndex);
   });
 
   it("dims all provenance cells when current issue is among related issues", () => {

@@ -133,13 +133,13 @@ No API call in this step.
 
 Before rendering, `withFileTypeMarkers` iterates every file in every commit and calls `resolveFileType(mrProjectPath, filePath, fileTypes)` to stamp `fileTypeName`, `fileTypeIcon`, and `fileTypeDisplayOrder` onto each `ReportCommitFile`. `fileTypes` comes from `regrizer.yaml` (or a single default catch-all type named **Files** with icon **📄** when that file is absent). `resolveFileType` returns the first entry in list order whose project-path and file-path globs both match. `displayOrder` is used only to sort file types for display in the overview.
 
-The **overview** is a collapsible tree rendered at the top of the report:
+The **overview** is rendered as one summary table per analyzed issue I at the top of the report:
 
-- Per analyzed issue (header)
-- Per related MR (`<details open>`)
-- Per commit in that MR (`<details open>`)
-- Per file type present in that commit, in `displayOrder` order; types with no files in the commit are omitted
-- For each file type: unique origin issues from all files of that type, excluding the currently analyzed issue
+- Columns are the union of every file modified by an MR of I, keyed by `(fileTypeDisplayOrder, filePath)` and sorted by `displayOrder` then path.
+- Two header rows: the first holds the file type icon, the second holds the file path inside an inline-block element rotated `-90deg`.
+- Rows are origin issues R aggregated by walking every `removed` and `paired` row across the files of I and grouping their `previousMergeRequestIssues`. The currently analyzed issue is filtered out.
+- Each aggregate also tracks the most recent `previousMergeRequest.mergedAt` seen for that origin issue. Rows are sorted by that timestamp descending; rows without a timestamp fall back to title order.
+- Each cell shows `-<removedCount>/<pairedCount>` for the (origin issue R, file F) pair, where `removedCount` is the number of `removed` rows in F whose related issues include R, and `pairedCount` is the analogous count for `paired` rows. Cells where both counts are zero are left empty.
 
 The **detail sections** output nested `details/summary` for issue → MR → commit → file (all `open` by default), with one color-coded unified table per file (`context`, `paired`, `added`, `removed` rows). Each file label is prefixed with its file type icon. The table has seven columns: line number (after), code after commit, line number (before), code before commit, previous commit, merge request, related issues. The before-side line number is populated for hunk-internal context rows (from `entry.oldLineNumber`) and for paired/removed rows (from `before.lineNumber`). The code-before column is populated for all row kinds: context rows carry the same text as code-after, and changed rows carry the pre-image text.
 

@@ -129,12 +129,17 @@ Rules:
 
 The report hierarchy is:
 
-1. An **overview** at the top of the report, structured as:
-   - Per analyzed issue
-   - Per related merge request (collapsible)
-   - Per commit in that MR (collapsible)
-   - Per file type present in that commit (in `displayOrder` order; types with no matching files are omitted)
-   - List of origin issues that introduced the lines changed by the commit (the currently analyzed issue is hidden; only issues introduced by other work appear)
+1. An **overview** at the top of the report, with one summary table per analyzed issue I:
+   - Rows: every origin issue R referenced by a `removed` or `paired` line whose blame links to a merge request whose related issues include R. The currently analyzed issue I is excluded.
+     - Rows are sorted by the most recent `merged_at` of the merge requests (taken from the row's blame provenance) referencing R, descending. Issues with no known merge date sort last by title.
+     - The row label is `#iid: title` (or just `title` if iid is unknown) and links to R.
+   - Columns: every file modified by a merge request of I (one column per `(file type, file path)`). Columns are sorted by file type `displayOrder`, then by file path.
+     - The first header row contains the file type icon for each column.
+     - The second header row contains the file path, rotated 90° (read bottom-to-top).
+   - Cells contain `-n/p` where:
+     - `n` is the number of `removed` rows in that file whose blame's related issues include R.
+     - `p` is the number of `paired` rows in that file whose blame's related issues include R.
+     - Cells with `n = p = 0` are left empty.
 2. Merge requests (latest merged first)
 3. Commit selected as the merge result on target branch
 4. Files touched by that commit, each labeled with its file type icon
